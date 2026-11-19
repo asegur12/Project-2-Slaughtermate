@@ -13,21 +13,27 @@ powershell -ExecutionPolicy Bypass -File desktop\build.ps1
 | Control | Action |
 |---|---|
 | W A S D | Move |
+| Space | Dash toward the cursor (1 s cooldown) |
 | Left click | Basic attack (aimed at the mouse) |
 | Hold left click, release | Charged attack |
 | 1 / 2 / 3 | Cast equipped spells |
 | Esc / P | Pause |
 
 ## The game
-- **6 floors.** Survive the swarm of black pieces until the floor's giant checkered boss arrives, then kill it to clear the floor.
+- **6 floors, each a new board.** Survive the swarm of black pieces until the floor's giant checkered boss arrives, then kill it to clear the floor. Every floor generates a fresh map with its own look: Opening (light, cool, sparse), Early Game, Midgame (the classic board), Middle Gambit (darker, denser), Climax (red and orange, with fire-shooting watchtowers you can destroy) and Endgame (a purple, black, white and gold maze).
+- **Difficulty.** Pick Easy, Normal or Hard on the menu. It scales enemy HP, damage and projectile speed, and multiplies your score (×0.75 / ×1 / ×1.5).
 - **Promotion.** You start as a white Pawn and are promoted after each boss: Knight, Bishop, Rook, Queen, then King. Each form grants bonuses.
 - **Bosses:** Iron Pawn, Mad Knight, Cardinal Bishop, Siege Rook, Black Queen, Checkered King. Each has its own telegraphed attacks and enrages below 50% HP.
 - **Enemies:** pawns swarm, knights hop in L-shapes (over walls), bishops move diagonally and snipe, rooks charge along straight lines, queens fire volleys and lunge, and kings summon pawns and haste nearby allies.
-- **Weapons** (pick 1 per run): Sword (Spin Slash), Bow (Great Arrow), Staff (Arcane Blast), Hammer (Earth Slam).
-- **30 spells in 5 tiers** (6 per tier). Tier 4–5 spells are Sun, Moon, Darkness, Light, Tech and Hyper. You can equip 3, and picking a spell you already own levels it up.
+- **8 weapons** (pick 1 per run): Sword (Spin Slash), Bow (Great Arrow), Staff (Arcane Blast), Hammer (Earth Slam), Scythe (semicircle sweeps; Crude Reap heals you), Shield (knockback bashes; Shield Rush), Club (rectangular slams; wind-up swing with 3 chain explosions) and Tome (3 piercing spirits that deal damage over time; 9-spirit burst).
+- **75 spells in 5 tiers.** Each tier has one spell of each of 15 elements: fire, ice, lightning, earth, wind, nature, poison, arcane, light, sun, moon, darkness, tech, hyper and the new psychic **Mind** element, whose spells deal damage over time. Heavy tier 3–5 spells have a short wind-up. You can equip 3, and picking a spell you already own levels it up.
 - **Fair randomness.** Every level-up offers 3 cards. Each tier uses a shuffle bag, so every spell in a tier shows up before any repeats, and a pity counter raises the odds of tier 4–5 the longer you go without one.
 - **Shop** between floors: spell scrolls, relics (stat upgrades), a healing elixir and rerolls.
 - **Scaling.** Enemy HP and damage rise with each floor, your level and time spent on the floor.
-- **Hall of Kings.** The menu shows the top 10 runs (highest floor and score), saved in your browser.
+- **Hall of Kings.** The menu shows the top 10 runs (highest floor, score, weapon and difficulty), saved in your browser.
 
-**Score** = kills (piece value × floor) + 2,500 × floor per boss + 1,000 per floor reached + 50 × level + 10,000 for a victory.
+**Score** = (kills (piece value × floor) + 2,500 × floor per boss + 1,000 per floor reached + 50 × level + 10,000 for a victory) × difficulty multiplier.
+
+## Development
+- Requirements: `spec.md` (from `Project_2.txt`). Decisions: `docs/decisions/`.
+- Tests: `npm test` (or `node --test tests/`). No dependencies needed; the tests load the game from `index.html`. Each test name starts with the requirement ID it checks.
