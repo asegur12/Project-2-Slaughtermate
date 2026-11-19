@@ -24,7 +24,7 @@ function makeCtx(calls) {
       if (k === 'measureText') return () => ({ width: 10 });
       return (...args) => { if (calls) calls.push([k, args]); return proxy; };
     },
-    set(t, k, v) { t[k] = v; return true; },
+    set(t, k, v) { t[k] = v; if (calls) calls.push(['set:' + String(k), [v]]); return true; },
   });
   return proxy;
 }
