@@ -124,7 +124,8 @@ function loadGame(opts) {
       dt = dt || 1 / 60;
       const n = Math.round(seconds / dt);
       context.__dt = dt;
-      for (let i = 0; i < n; i++) vm.runInContext("if(G.state==='play')update(__dt);", context);
+      // same as the game's frame(): update, then the camera follows the player
+      for (let i = 0; i < n; i++) vm.runInContext("if(G.state==='play'){update(__dt);cam.x=P.x-VW/2;cam.y=P.y-VH/2;}", context);
     },
     // Place the mouse at a world position (camera follows the player).
     aimAt(wx, wy) {

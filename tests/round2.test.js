@@ -511,9 +511,10 @@ test('R35 a wound-up spell fires at the cursor after the wind-up and the player 
   const x0 = g.run('P.x');
   g.fire('keydown', { key: 'd' });
   g.step(wu / 2);
+  g.fire('keyup', { key: 'd' });
+  // re-aim at the dummy while still winding up (camera is still once the player stops)
   g.aimAt(g.run('D.x'), g.run('D.y'));
   g.step(wu / 2 + 0.05);
-  g.fire('keyup', { key: 'd' });
   assert.ok(g.run('P.x') > x0, 'player moved during the wind-up');
   assert.equal(g.run('G.zones.length'), 1, 'spell fired after the wind-up');
   assert.ok(g.run('Math.hypot(G.zones[0].x-D.x,G.zones[0].y-D.y)') < 5, 'aimed at the cursor at release time');
