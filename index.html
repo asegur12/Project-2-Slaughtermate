@@ -50,6 +50,9 @@ input{font:16px Georgia;padding:6px 10px;border-radius:6px;border:2px solid var(
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
 .stats div{background:#1e130b;border:1px solid #7a5a32;border-radius:6px;padding:8px;text-align:center;font-size:13px}
 .stats b{display:block;font-size:22px;color:var(--gold)}
+.diffs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px}
+.diffs .card{padding:7px 9px;text-align:center}.diffs .card h3{font-size:15px;margin:0}.diffs .card p{font-size:11px;margin:2px 0 0}
+#weapons .card{padding:8px 10px}#weapons .card p{font-size:12px;margin:0 0 2px}
 .eq{display:inline-block;margin:4px;padding:6px 10px;background:#1e130b;border:2px solid #7a5a32;border-radius:6px;font-size:14px}
 </style>
 </head>
@@ -64,15 +67,17 @@ input{font:16px Georgia;padding:6px 10px;border-radius:6px;border:2px solid var(
       <div>
         <h2>HALL OF KINGS</h2>
         <div class="best"><div>Highest Floor<b id="bestFloor">–</b></div><div>Best Score<b id="bestScore">–</b></div></div>
-        <table><thead><tr><th>#</th><th>Name</th><th>Floor</th><th>Score</th><th>Weapon</th></tr></thead><tbody id="scores"></tbody></table>
+        <table><thead><tr><th>#</th><th>Name</th><th>Floor</th><th>Score</th><th>Weapon</th><th>Difficulty</th></tr></thead><tbody id="scores"></tbody></table>
       </div>
       <div>
+        <h2>CHOOSE YOUR DIFFICULTY</h2>
+        <div id="difficulty" class="diffs"></div>
         <h2>CHOOSE YOUR WEAPON</h2>
         <div id="weapons" class="grid2"></div>
       </div>
     </div>
     <button class="btn" id="startBtn">BEGIN THE GAME</button>
-    <div class="controls">WASD move · Left click attack · Hold left click to charge, release to unleash · 1 2 3 cast spells · Esc pause<br>
+    <div class="controls">WASD move · Space dash · Left click attack · Hold left click to charge, release to unleash · 1 2 3 cast spells · Esc pause<br>
     Survive each floor, slay the giant checkered boss, get promoted, shop, repeat. Beat the King on Floor 6 to win.</div>
   </div>
 </div>
@@ -1068,7 +1073,8 @@ function updatePlayer(dt){
 }
 
 /* ================= UI: MENUS ================= */
-let selWeapon='sword';
+let selWeapon='sword',selDifficulty='normal';
+const DIFF_DESC={easy:'Enemies have less HP and hit softer. Score ×0.75',normal:'The standard board. Score ×1',hard:'Tougher enemies, harder hits, faster shots. Score ×1.5'};
 function hideAll(){for(const id of ['menu','levelup','replace','shop','pause','end'])$(id).classList.add('hidden');}
 function loadScores(){try{return JSON.parse(localStorage.getItem('slaughtermate_scores')||'[]');}catch(e){return [];}}
 function saveScores(a){try{localStorage.setItem('slaughtermate_scores',JSON.stringify(a));}catch(e){}}
@@ -1077,15 +1083,18 @@ function showMenu(){
  const sc=loadScores();
  $('bestFloor').textContent=sc.length?Math.max(...sc.map(s=>s.floor))+(sc.some(s=>s.won)?' ♔':''):'–';
  $('bestScore').textContent=sc.length?Math.max(...sc.map(s=>s.score)).toLocaleString():'–';
- $('scores').innerHTML=sc.length?sc.map((s,i)=>`<tr><td>${i+1}</td><td>${esc(s.name)}${s.won?' ♔':''}</td><td>${s.floor}</td><td>${s.score.toLocaleString()}</td><td>${esc(s.weapon)}</td></tr>`).join('')
-  :'<tr><td colspan="5" style="text-align:center;opacity:.7">No games played yet. Be the first king.</td></tr>';
+ $('scores').innerHTML=sc.length?sc.map((s,i)=>`<tr><td>${i+1}</td><td>${esc(s.name)}${s.won?' ♔':''}</td><td>${s.floor}</td><td>${s.score.toLocaleString()}</td><td>${esc(s.weapon)}</td><td>${esc(s.difficulty||'Normal')}</td></tr>`).join('')
+  :'<tr><td colspan="6" style="text-align:center;opacity:.7">No games played yet. Be the first king.</td></tr>';
+ const db=$('difficulty');db.innerHTML='';
+ for(const k in DIFFICULTY){const d=document.createElement('div');d.className='card stat'+(k===selDifficulty?' sel':'');
+  d.innerHTML=`<h3>${DIFFICULTY[k].name}</h3><p>${DIFF_DESC[k]}</p>`;d.onclick=()=>{selDifficulty=k;showMenu();};db.appendChild(d);}
  const wb=$('weapons');wb.innerHTML='';
  for(const k in WEAPONS){const w=WEAPONS[k],d=document.createElement('div');d.className='card stat'+(k===selWeapon?' sel':'');
   d.innerHTML=`<span class="ico">${w.ico}</span><h3>${w.name}</h3><p>${w.desc}</p><p><b>Charged:</b> ${w.cdesc}</p>`;
   d.onclick=()=>{selWeapon=k;showMenu();};wb.appendChild(d);}
  $('menu').classList.remove('hidden');
 }
-$('startBtn').onclick=()=>newRun(selWeapon);
+$('startBtn').onclick=()=>newRun(selWeapon,selDifficulty);
 function setPaused(on){if(on){G.state='paused';mouse.down=false;$('pause').classList.remove('hidden');}else{G.state='play';$('pause').classList.add('hidden');}}
 $('resumeBtn').onclick=()=>setPaused(false);
 $('quitBtn').onclick=()=>{$('pause').classList.add('hidden');G.state='play';endRun(false);};
@@ -1093,7 +1102,7 @@ function resume(){G.state='play';mouse.down=false;P.holdT=0;}
 function spellCardHTML(id,extra){
  const s=SPELL_BY_ID[id],own=P.spells.find(x=>x&&x.id===id);
  return `<span class="badge" style="background:${TIER_COL[s.tier]}">Tier ${s.tier}</span> <span class="badge" style="background:${EL_COL[s.el]}">${s.el}</span>
-  <h3>${s.name}${own?' <small>(Lv '+own.lvl+' → '+(own.lvl+1)+')</small>':''}</h3><p>${s.desc}</p><p style="opacity:.7">Cooldown ${s.cd}s${s.dmg?' · Power '+s.dmg:''}</p>${extra||''}`;
+  <h3>${s.name}${own?' <small>(Lv '+own.lvl+' → '+(own.lvl+1)+')</small>':''}</h3><p>${s.desc}</p><p style="opacity:.7">Cooldown ${s.cd}s${s.dmg?' · Power '+s.dmg:''}${s.windup?' · Wind-up '+s.windup+'s':''}</p>${extra||''}`;
 }
 function openLevelUp(){
  G.state='levelup';mouse.down=false;
@@ -1142,7 +1151,7 @@ function renderShop(){
   <h2>RELICS & POTIONS</h2><div class="cards3 four" id="shItems"></div>
   <h2>YOUR SPELLS</h2><div class="row">${P.spells.map((s,i)=>`<span class="eq">${i+1}: ${s?SPELL_BY_ID[s.id].name+' Lv'+s.lvl:'— empty —'}</span>`).join('')}</div>
   <div class="row"><button class="btn small" id="shRe">Reroll scrolls (${S.reroll}g)</button></div>
-  <button class="btn" id="shGo">ADVANCE TO FLOOR ${f+1} ▶</button></div>`;
+  <button class="btn" id="shGo">ADVANCE TO FLOOR ${f+1}: ${themeFor(f+1).name.toUpperCase()} ▶</button></div>`;
  const sb=$('shSpells');
  S.spells.forEach((id,i)=>{const s=SPELL_BY_ID[id],price=SPELL_PRICE[s.tier],sold=S.sold[i],d=document.createElement('div');
   d.className='card t'+s.tier+(sold||P.gold<price?' dis':'');
@@ -1166,7 +1175,7 @@ function getName(){try{return localStorage.getItem('slaughtermate_name')||'Playe
 function endRun(won){
  if(G.state==='over')return;
  G.state='over';mouse.down=false;
- const final=G.score+(G.floor-1)*1000+P.level*50+(won?10000:0);G.final=final;
+ const final=Math.round((G.score+(G.floor-1)*1000+P.level*50+(won?10000:0))*diff().score);G.final=final;
  const m=Math.floor(G.runTime/60),s=Math.floor(G.runTime%60);
  const el=$('end');
  el.innerHTML=`<div class="panel" style="max-width:640px;text-align:center">
@@ -1174,12 +1183,13 @@ function endRun(won){
   <p class="sub">${won?'You rose from a lowly pawn to rule the entire board.':'Your '+FORM_NAMES[P.form]+' was taken on Floor '+G.floor+'.'}</p>
   <div class="stats"><div>Score<b>${final.toLocaleString()}</b></div><div>Floor<b>${G.floor}${won?' ♔':''}</b></div><div>Kills<b>${G.kills}</b></div>
   <div>Level<b>${P.level}</b></div><div>Weapon<b>${WEAPONS[G.weapon].name}</b></div><div>Time<b>${m}:${String(s).padStart(2,'0')}</b></div></div>
+  <p class="sub">Difficulty: ${diff().name} (score ×${diff().score})</p>
   <p>Name for the Hall of Kings: <input id="nameIn" maxlength="14" value="${esc(getName())}"></p>
   <button class="btn" id="saveBtn">SAVE & RETURN</button></div>`;
  $('saveBtn').onclick=()=>{
   const name=($('nameIn').value||'Player').trim().slice(0,14)||'Player';
   try{localStorage.setItem('slaughtermate_name',name);}catch(e){}
-  const sc=loadScores();sc.push({name,floor:G.floor,score:final,weapon:WEAPONS[G.weapon].name,won,date:Date.now()});
+  const sc=loadScores();sc.push({name,floor:G.floor,score:final,weapon:WEAPONS[G.weapon].name,difficulty:diff().name,won,date:Date.now()});
   sc.sort((a,b)=>b.score-a.score);saveScores(sc.slice(0,10));showMenu();
  };
  setTimeout(()=>el.classList.remove('hidden'),won?600:900);
