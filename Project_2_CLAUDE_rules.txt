@@ -1,0 +1,22 @@
+This is a ruleset for the agent generating "Slaughtermate" to abide by in the generation process
+
+1. Try to add all of these:
+These are a lot to add, so do try your best when making the code
+2. Incorporate designs:
+The designs that should be used are basic chess piece designs, with the player being a white pawn that evolves into the other 5 pieces throughout the waves, and the enemies should be black pieces that vary in type with their own behaviors and attacks set, Bosses should be checkered Giant pieces
+3. Effects:
+The user is not expecting exemplary flashy effects, simple colors, shapes and lines with some brief particle effect (like piece outlines) should suffice
+4. Space and tokens:
+This project is expected to use a lot of tokens, so do attempt to reserve some token space, if such is not necessary, ignore this rule
+5. Publicity and gameplay:
+This game should not require Wifi to play, it should only be ran offline
+6. Coding language and controls:
+use whatever coding language you see can fit this well. As for controls, WASD should be the movement keys (W-up,A-left,S-down,D-right), a left click should be a basic attack while a held down left click should be a charged attack, the keys 1,2,3 should be the equipped spells. The mouse will be where the attacks are aimed at
+7. Animations:
+The client does not expect flashiness or over the top animation, simple bouncing, swaying, shaking, wobbling, and simple movement of the actual pieces are preferred
+8. Scores:
+Show a scoreboard in the games UI before playing, showing the highest floor and their score, you determine the score
+9. Game UI:
+Simple and understanding, but it should be themed of chess.
+10. Enemy behavior:
+Determine behavior for each enemy piece, use other games that exist similar to this format (Destropolis, Cookie run: Tower of adventure, Elden ring) can be used as simple references

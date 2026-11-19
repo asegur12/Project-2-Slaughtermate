@@ -1,0 +1,70 @@
+This is a spec for the second project of the final project
+
+The problem: The client is bored and wants a game generated for them, however, they want a game generated for them that they can play, but they want one on a different style. This client played two different games in the past time of days, those games being
+	-Chess, an ancient game of strategy, it should be known
+	-A hack'n'slash game where the player gains various powers and weapons to slaughter waves of enemies and bosses
+
+The client is assumed to want a game that is tailored to combine both of these elements, with chess being the design and the hack n slash being the actual gameplay, they desire a game combining both where there should be:
+	-A large map, with some structures like cities or castles
+	-Enemies, a large swarm that come towards the player from all sides and spawn on the outskirts of the map
+	-Powerful weapons and spells, ones that can deal large amounts of damage and have large areas of effect or range, specifically the high tier should have something to do with sun, moon, darkness, light, tech and hyper types
+	-Difficulty and rewards, enemies should scale in hp and strength with each level gained and rewards should be random
+
+The client has also listed a few suggestions that should be directly added, because they really want it:
+	-6 bosses, a big giant piece of each kind that concludes each wave and needs to be killed before going to the next one
+	-Really large spells, high tier spells that are able to deal large amounts of damage in a large area, and a variety of other spells too
+	-Cool weapons, each with their own class
+	-a shop where I can buy spells and other items
+From these suggestion, the clients game should have the following aswell:
+	-A rarity system of spells, 5 tiers, tier 1 to 5, with 1 and 2 being small scale spells that can clear out lower rank enemies quickly, struggle with higher rank enemies, but can deal sufficient damage. 3 and 4 being average to strong spells that can deal large scale damage, in larger areas, and tier 5, spells that deal massive damage and effect equally massive areas
+	-a decent spell loadout, atleast 5 to 8 spells of each type, to maintain space, and have the user be able to equip 3 spells
+	-Enemy scaling, as said before, but they should be able to survive powerful attacks and kill the user by the late game
+	-fair randomness system, make it so each reward that gives spells maintain a fair way to get each type
+	-Weapons class for each run, from what the client wants, there should be 4 weapon classes:
+		-Sword: Melee slashes and a spin slash for a charged attack
+		-Bow: Ranged attack and a big arrow for a charged attack
+		-Staff: Ranged area attacks and a big magic blast as a charged attack
+		-Hammer: Melee area attacks and a giant slam as a charged attack
+
+From these suggestions, you, the agent who will generate this program as listed and described above.
+
+==ROUND 2 NEW REQUIREMENTS==
+
+these are some new requirements that will be added to the game, these requirements and rules are to be adhered to
+Note: the game is already made, so simple add and edit it
+
+Spell changes: the design of the spells works really well, but now that the client has seen them, they can now be a little bit more flashy and awe-inducing, add sparkles,particle effects and slight detail, same goes for enemy attacks
+
+Map changes: The map itself now feels too stale, the city and structure is nice, but it should now be changed. Once the player reaches a new floor, the maps design should change entirely
+	-Floor one:opening (lighter and cool colors preferred here and minimal structures)
+	-Floor two:early game (slightly darker colors from the first floor, add some more structures)
+	-Floor three:midgame (Same as what was currently there,same structure count)
+	-Floor four:middle gambit (Darker colors, but not too dark, slightly more structures and buildings)
+	-Floor five:climax (Pretty dark colors, red and orange should be most of it, more structures and now add hostile ones)
+	-Floor six: endgame (purple with black and white and gold, a slightly maze like map should be well)
+display the floor name when going to it
+
+Game difficulty: After playing, the client wants a change in difficulty:
+	-allow the user to change the difficulty before playing, ranging from
+		-Easy: enemies have less hp and deal less damage
+		-Normal: enemies have standard difficulty and stats, whats already made should suffice
+		-Hard: enemies have higher stats and stronger attacks
+
+Weapons: The client now wants more weapons and now a new control button:
+	-Scythe: a scythe that attacks in a semicircle, the charge should be a crude slash that steals hp
+	-Shield: A shield that lets the user bash as they attack, its charge attack is a wider and stronger rush
+	-Club: A special weapon that slams a rectangular area, the charge should be a windup swing that causes 3 chain explosions
+	-Tome: A magic tome that shoots out 3 spirits that pierce and deal short term damage over time, the charge should be a large burst releasing 9 spirits and pushback
+	-New button control:Dash, the player performs a short dash towards their cursor by pressing space, it has a 1 second cooldown
+
+Spells: The client now wants new spells:
+	-Add atleast 1 spell of each element to each tier, if there already exists one of an element, dont add a new one
+	-New spell type: Mind, being able to use psychic power to deal damage over time to enemies, add one spell of each tier
+		-tier one should take inspiration from Pokémon's "psychic" move
+		-Tier 5 should take inspiration from Pokemons's "psystrike" move
+	-Some spells need windups, slight ones
+
+this will be all for the first run.
+
+
+
