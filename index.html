@@ -156,7 +156,12 @@ const WEAPONS={
  bow:{name:'Bow',ico:'➶',dmg:19,cd:0.40,charge:0.9,desc:'Long-range arrows that pierce one foe.',cdesc:'Great Arrow: pierces the entire line.'},
  staff:{name:'Staff',ico:'✦',dmg:15,cd:0.50,charge:1.0,desc:'Exploding magic orbs. +10% spell damage.',cdesc:'Arcane Blast: huge explosion at the cursor.'},
  hammer:{name:'Hammer',ico:'⚒',dmg:36,cd:0.68,charge:1.1,desc:'Crushing area blows with knockback. +20 HP.',cdesc:'Earth Slam: giant shockwave that stuns.'},
+ scythe:{name:'Scythe',ico:'☾',dmg:26,cd:0.5,charge:0.95,desc:'Reaping sweeps across your whole front half.',cdesc:'Crude Reap: a brutal slash that heals you for 25% of the damage dealt.'},
+ shield:{name:'Shield',ico:'⛨',dmg:22,cd:0.45,charge:0.9,desc:'Bash foes back as you attack. Take 10% less damage.',cdesc:'Shield Rush: charge forward, flattening a wide path.'},
+ club:{name:'Club',ico:'♣',dmg:34,cd:0.62,charge:1.0,desc:'Slams a long rectangle in front of you.',cdesc:'Chain Smash: a wind-up swing that sets off 3 chain explosions.'},
+ tome:{name:'Tome',ico:'📖',dmg:11,cd:0.55,charge:1.0,desc:'Fires 3 piercing spirits that haunt foes with damage over time.',cdesc:'Spirit Burst: 9 spirits burst out and push foes back.'},
 };
+const DASH_CD=1,DASH_DIST=190,DASH_TIME=0.15;   // R32
 const SPELLS=[
  // Tier 1: small scale. Clears weak pieces quickly, struggles against strong ones.
  {id:'ember',name:'Ember Bolt',tier:1,el:'fire',kind:'bolt',dmg:32,r:45,speed:620,cd:1.2,desc:'A small fire bolt that bursts on impact.'},
@@ -330,6 +335,7 @@ addEventListener('keydown',e=>{
  const k=e.key.toLowerCase();keys[k]=true;
  if(G.state==='play'){
   if(k==='1'||k==='2'||k==='3')castSpell(+k-1);
+  if(k===' '||e.code==='Space'){e.preventDefault();dash();}
   if(k==='escape'||k==='p')setPaused(true);
  }else if(G.state==='paused'&&(k==='escape'||k==='p'))setPaused(false);
 });
@@ -435,9 +441,11 @@ function makeState(){
 function xpFor(l){return Math.floor(6+l*3.5+l*l*0.15);}
 function makePlayer(w){
  const p={x:WORLD/2,y:WORLD/2,r:15,hp:100,maxHp:100,speed:230,form:0,level:1,xp:0,xpNext:xpFor(1),gold:0,dmgMult:1,spellMult:1,cdMult:1,atkSpeed:1,
-  armor:0,crit:0.05,magnet:110,regen:0,shield:0,shieldT:0,iframes:0,hurt:0,atkCd:0,holdT:0,charge:0,charging:false,aim:0,swingT:0,moving:false,spells:[null,null,null]};
+  armor:0,crit:0.05,magnet:110,regen:0,shield:0,shieldT:0,iframes:0,hurt:0,atkCd:0,holdT:0,charge:0,charging:false,aim:0,swingT:0,moving:false,spells:[null,null,null],
+  dashCd:0,dashT:0,dashA:0,rush:null,windup:0,windA:0,bashT:0,bashA:0};
  if(w==='staff')p.spellMult+=0.1;
  if(w==='hammer'){p.maxHp+=20;p.hp+=20;}
+ if(w==='shield')p.armor+=0.1;
  return p;
 }
 G=makeState();P=makePlayer('sword');
@@ -582,7 +590,7 @@ function gainXp(v){
 
 /* ================= PLAYER ATTACKS ================= */
 function releaseAttack(){
- const w=WEAPONS[G.weapon];
+ if(P.windup>0||P.rush){P.charging=false;P.charge=0;return;}   // busy with a club wind-up or shield rush
  if(P.holdT>0.2&&P.charge>=1)chargedAttack();
  else if(P.atkCd<=0)basicAttack();
  P.charging=false;P.charge=0;
@@ -598,6 +606,14 @@ function basicAttack(){
    G.pproj.push({x:P.x,y:P.y,vx:ca*560,vy:sa*560,r:9,dmg,life:d/560,pierce:0,hit:new Set(),explode:70,kind:'orb',color:'#c77dff'});break;}
   case 'hammer':{const cx=P.x+ca*55,cy=P.y+sa*55;damageCircle(cx,cy,72,dmg,{knock:55,fx:P.x,fy:P.y});
    addFx({kind:'ring',x:cx,y:cy,r0:20,r:75,color:'#e8d0a0',w:6,dur:0.25});burst(cx,cy,8,'#a08060');G.shake=Math.max(G.shake,3);break;}
+  case 'scythe':damageArc(P.x,P.y,a,110,Math.PI/2,dmg,{knock:20,fx:P.x,fy:P.y});   // a full semicircle in front (R28)
+   addFx({kind:'arc',x:P.x,y:P.y-12,r:95,a,spread:Math.PI/2,color:'#d8d0ff',w:6,dur:0.2});
+   for(let k=0;k<6;k++){const b=a+rand(-1.5,1.5);particle('spark',P.x+Math.cos(b)*95,P.y-12+Math.sin(b)*95,'#e8e0ff',{a:b,v:60,dur:0.3});}break;
+  case 'shield':damageArc(P.x,P.y,a,62,0.8,dmg,{knock:90,fx:P.x,fy:P.y});P.bashT=0.12;P.bashA=a;   // bash and step in (R29)
+   addFx({kind:'ring',x:P.x+ca*40,y:P.y+sa*40-10,r0:8,r:40,color:'#e0b84f',w:5,dur:0.2});debris(P.x+ca*45,P.y+sa*45,4,'#8a7050',0.6);break;
+  case 'club':damageRect(P.x,P.y,a,150,70,dmg,{knock:40,fx:P.x,fy:P.y});   // rectangular slam (R30)
+   addFx({kind:'rect',x:P.x,y:P.y,a,len:150,w:70,color:'#e8c890',dur:0.25});debris(P.x+ca*130,P.y+sa*130,6,'#8a6a40',0.8);G.shake=Math.max(G.shake,3);break;
+  case 'tome':for(let k=-1;k<=1;k++)spirit(a+k*0.14,dmg,0.9);break;   // three piercing spirits (R31)
  }
 }
 function chargedAttack(){
@@ -613,7 +629,34 @@ function chargedAttack(){
   case 'hammer':damageCircle(P.x,P.y,250,dmg*3.6,{knock:110,stun:1.2});
    for(let i=0;i<3;i++)addFx({kind:'ring',x:P.x,y:P.y,r0:20,r:250+i*20,color:i?'#c09060':'#ffffff',w:10-i*3,dur:0.4+i*0.1});
    burst(P.x,P.y,35,'#a08060',2.2);G.shake=Math.max(G.shake,15);break;
+  case 'scythe':{G.dealt=0;damageArc(P.x,P.y,a,170,Math.PI*0.6,dmg*3.4,{knock:60,fx:P.x,fy:P.y});   // crude reap steals HP
+   const heal=Math.min(G.dealt*0.25,P.maxHp*0.25);if(heal>0){P.hp=Math.min(P.maxHp,P.hp+heal);floatText(P.x,P.y-55,'+'+Math.round(heal),'#ff6b8a',true);}
+   addFx({kind:'arc',x:P.x,y:P.y-12,r:155,a,spread:Math.PI*0.6,color:'#b0102a',w:16,dur:0.3});addFx({kind:'arc',x:P.x,y:P.y-12,r:150,a,spread:Math.PI*0.6,color:'#ffd0d8',w:4,dur:0.25});
+   for(let k=0;k<16;k++){const b=a+rand(-1.8,1.8),r=rand(60,160);particle('spark',P.x+Math.cos(b)*r,P.y-12+Math.sin(b)*r,'#ff4060',{a:b+Math.PI,v:r*2.5,dur:0.35});}
+   G.shake=Math.max(G.shake,6);break;}
+  case 'shield':P.rush={a,t:0.32,hit:new Set(),dmg:dmg*3};P.iframes=Math.max(P.iframes,0.4);G.shake=Math.max(G.shake,4);break;
+  case 'club':P.windup=0.35;P.windA=a;G.clubBlasts=0;break;
+  case 'tome':for(let k=0;k<9;k++)spirit(k/9*TAU,dmg*1.6,1.1);
+   damageCircle(P.x,P.y,160,dmg*1.5,{knock:120,fx:P.x,fy:P.y});
+   addFx({kind:'ring',x:P.x,y:P.y,r0:20,r:170,color:'#a8f0ff',w:10,dur:0.4});sparkRing(P.x,P.y-12,120,24,'#a8f0ff');G.shake=Math.max(G.shake,7);break;
  }
+}
+function spirit(a,dmg,life){
+ G.pproj.push({x:P.x,y:P.y,vx:Math.cos(a)*520,vy:Math.sin(a)*520,r:9,dmg,life,pierce:999,hit:new Set(),explode:0,knock:6,kind:'spirit',color:'#a8f0ff',
+  o:{dot:[dmg*1.2,2],dotKey:'tome',dotCol:'#a8f0ff'}});
+}
+// Club charged attack: after the wind-up, three explosions march outward along the swing (R30).
+function clubSwing(){
+ const a=P.windA,ca=Math.cos(a),sa=Math.sin(a),x0=P.x,y0=P.y,dmg=WEAPONS.club.dmg*P.dmgMult*2.6;
+ addFx({kind:'arc',x:P.x,y:P.y-12,r:70,a,spread:1.4,color:'#ffffff',w:10,dur:0.2});
+ for(let k=0;k<3;k++)later(0.15*k,()=>{const x=x0+ca*110*(k+1),y=y0+sa*110*(k+1),r=85+12*k;G.clubBlasts++;
+  damageCircle(x,y,r,dmg,{knock:50});addFx({kind:'flash',x,y,r,color:'#ffb04a',dur:0.3});addFx({kind:'ring',x,y,r0:10,r:r*1.1,color:'#fff0c0',w:8,dur:0.35});
+  sparkle(x,y,12,'#ffb04a',1.2,r*0.4);debris(x,y,8,'#7a5030',1.1);G.shake=Math.max(G.shake,6);});
+}
+function dash(){
+ if(P.dashCd>0||P.rush||G.state!=='play')return;
+ const m=mouseWorld();P.dashA=Math.atan2(m.y-P.y,m.x-P.x);P.dashT=DASH_TIME;P.dashCd=DASH_CD;P.iframes=Math.max(P.iframes,0.2);
+ addFx({kind:'ghost',x:P.x,y:P.y,form:FORMS[P.form],dur:0.3});sparkle(P.x,P.y-12,8,'#ffffff',0.6);
 }
 
 /* ================= SPELLS ================= */
@@ -1002,8 +1045,19 @@ function updatePlayer(dt){
  const l=Math.hypot(mx,my),w=WEAPONS[G.weapon];
  if(mouse.down)P.holdT+=dt;
  P.charging=mouse.down&&P.holdT>0.2;P.charge=P.charging?clamp((P.holdT-0.2)/w.charge,0,1):0;
- const sp=P.speed*(P.charging?0.6:1);
- if(l){P.x+=mx/l*sp*dt;P.y+=my/l*sp*dt;P.moving=true;}else P.moving=false;
+ const sp=P.speed*(P.charging?0.6:1)*(P.windup>0?0.4:1);
+ if(l&&!P.rush){P.x+=mx/l*sp*dt;P.y+=my/l*sp*dt;P.moving=true;}else P.moving=false;
+ if(P.dashT>0){const st=Math.min(dt,P.dashT);P.dashT-=dt;P.x+=Math.cos(P.dashA)*DASH_DIST/DASH_TIME*st;P.y+=Math.sin(P.dashA)*DASH_DIST/DASH_TIME*st;
+  if(Math.random()<0.6)addFx({kind:'ghost',x:P.x,y:P.y,form:FORMS[P.form],dur:0.25});}
+ if(P.bashT>0){P.bashT-=dt;P.x+=Math.cos(P.bashA)*260*dt;P.y+=Math.sin(P.bashA)*260*dt;}
+ if(P.rush){const R=P.rush,st=Math.min(dt,R.t);R.t-=dt;P.x+=Math.cos(R.a)*1000*st;P.y+=Math.sin(R.a)*1000*st;   // shield rush (R29)
+  for(const e of G.enemies){if(e.dead||R.hit.has(e))continue;const rr=75+e.r;if(dist2(e.x,e.y,P.x,P.y)<rr*rr){R.hit.add(e);hitEnemy(e,R.dmg,{knock:110,fx:P.x,fy:P.y});sparkle(e.x,e.y-e.s,4,'#e0b84f',0.8);}}
+  debris(P.x,P.y,1,'#8a7050',0.5);if(Math.random()<0.5)addFx({kind:'ghost',x:P.x,y:P.y,form:FORMS[P.form],dur:0.2});
+  if(R.t<=0)P.rush=null;}
+ if(P.windup>0){P.windup-=dt;if(P.windup<=0){P.windup=0;clubSwing();}}
+ P.dashCd-=dt;
+ for(const e of G.enemies)if(e.static&&!e.dead){const dx=P.x-e.x,dy=P.y-e.y,rr=P.r+e.r,q=dx*dx+dy*dy;   // can't walk through watchtowers
+  if(q<rr*rr&&q>0.01){const d=Math.sqrt(q);P.x=e.x+dx/d*rr;P.y=e.y+dy/d*rr;}}
  P.x=clamp(P.x,P.r,WORLD-P.r);P.y=clamp(P.y,P.r,WORLD-P.r);collideStructures(P);
  const m=mouseWorld();P.aim=Math.atan2(m.y-P.y,m.x-P.x);
  P.atkCd-=dt;P.iframes-=dt;P.hurt-=dt;P.swingT-=dt;
