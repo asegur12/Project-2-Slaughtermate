@@ -1,0 +1,8 @@
+{
+  "name": "slaughtermate",
+  "private": true,
+  "description": "Chess-themed hack'n'slash game (single offline HTML file).",
+  "scripts": {
+    "test": "node --test tests/"
+  }
+}
