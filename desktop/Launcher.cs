@@ -1,4 +1,4 @@
-// Slaughtermate desktop launcher.
+// Magic Rush (formerly Slaughtermate) desktop launcher. The data folder keeps the old name so saves carry over.
 // The game (index.html) is embedded in this .exe. On launch it is unpacked to
 // %LOCALAPPDATA%\Slaughtermate and opened in its own app window using Microsoft
 // Edge (built into Windows 10/11). Falls back to Chrome, then the default browser.
@@ -8,8 +8,8 @@ using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
 
-[assembly: AssemblyTitle("Slaughtermate")]
-[assembly: AssemblyProduct("Slaughtermate")]
+[assembly: AssemblyTitle("Magic Rush")]
+[assembly: AssemblyProduct("Magic Rush")]
 [assembly: AssemblyVersion("1.0.0.0")]
 
 static class Launcher
@@ -61,7 +61,7 @@ static class Launcher
         }
         catch (Exception ex)
         {
-            MessageBox.Show("Could not start Slaughtermate:\n\n" + ex.Message, "Slaughtermate",
+            MessageBox.Show("Could not start Magic Rush:\n\n" + ex.Message, "Magic Rush",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }

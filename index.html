@@ -3,16 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Slaughtermate</title>
+<title>Magic Rush</title>
 <style>
-:root{--gold:#e0b84f;--ivory:#f4ecd8;--wood:#3b2618}
+/* R60: fantasy medieval UI (default): deep forest-green leather panels, parchment cards, gold trim.
+   body.chess restores the Round 3 wooden chess look (R62). */
+:root{--gold:#e0b84f;--ivory:#f4ecd8;--wood:#3b2618;--pa:#22382c;--pb:#122219;--bg:#0e1712;--rim:#0a120d;--hfont:'Palatino Linotype','Book Antiqua',Palatino,Georgia,serif}
+body.chess{--pa:#4a2f1c;--pb:#2e1d11;--bg:#1a120c;--rim:#1b110a;--hfont:Georgia,'Times New Roman',serif}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;overflow:hidden;background:#1a120c;font-family:Georgia,'Times New Roman',serif;color:var(--ivory);user-select:none}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);font-family:Georgia,'Times New Roman',serif;color:var(--ivory);user-select:none}
+h1{font-family:var(--hfont)}
+body:not(.chess) h1{color:#f6e3a8;text-shadow:0 0 12px rgba(224,184,79,.45),3px 3px 0 #000}
+body:not(.chess) .card,body:not(.chess) .logent:not(.locked){background:#f1e4c3}
+.sico{float:right;margin:-2px 0 0 6px;line-height:0}.sico svg{display:block}
+.goldbar{width:16px;height:11px;vertical-align:-1px}
+.crown svg{display:inline-block;vertical-align:top}
 canvas{display:block;cursor:crosshair}
 .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,6,3,.72);z-index:5}
 #replace{z-index:7}
 .hidden{display:none!important}
-.panel{background:linear-gradient(#4a2f1c,#2e1d11);border:3px solid var(--gold);border-radius:10px;padding:20px 26px;max-width:1000px;width:94%;max-height:94vh;overflow:auto;box-shadow:0 0 0 6px #1b110a,0 20px 60px #000}
+.panel{background:linear-gradient(var(--pa),var(--pb));border:3px solid var(--gold);border-radius:10px;padding:20px 26px;max-width:1000px;width:94%;max-height:94vh;overflow:auto;box-shadow:0 0 0 6px var(--rim),0 20px 60px #000}
 h1{margin:0;text-align:center;font-size:52px;letter-spacing:6px;color:var(--ivory);text-shadow:3px 3px 0 #000}
 h2{margin:10px 0 10px;color:var(--gold);font-size:19px;letter-spacing:2px;border-bottom:1px solid #7a5a32;padding-bottom:4px}
 .sub{text-align:center;margin:4px 0 14px;color:#d8c7a4;font-style:italic}
@@ -69,11 +78,11 @@ input{font:16px Georgia;padding:6px 10px;border-radius:6px;border:2px solid var(
 
 <div id="menu" class="overlay">
   <div class="panel">
-    <h1>♟ SLAUGHTERMATE ♚</h1>
-    <p class="sub">A chess hack'n'slash. Rise from Pawn to King: ♙ → ♘ → ♗ → ♖ → ♕ → ♔</p>
+    <h1 id="gameTitle">⚔ MAGIC RUSH ✦</h1>
+    <p class="sub" id="gameSub">A fantasy hack'n'slash. Rise from Squire, Novice or Scout to legend.</p>
     <div class="cols">
       <div>
-        <h2>HALL OF KINGS</h2>
+        <h2 id="hallTitle">HALL OF HEROES</h2>
         <div class="best"><div>Highest Floor<b id="bestFloor">–</b></div><div>Best Score<b id="bestScore">–</b></div></div>
         <table><thead><tr><th>#</th><th>Name</th><th>Floor</th><th>Score</th><th>Weapon</th><th>Difficulty</th></tr></thead><tbody id="scores"></tbody></table>
       </div>
@@ -85,9 +94,9 @@ input{font:16px Georgia;padding:6px 10px;border-radius:6px;border:2px solid var(
       </div>
     </div>
     <button class="btn" id="startBtn">BEGIN THE GAME</button>
-    <div class="row"><button class="btn small" id="logBtn">✦ SPELL LOGBOOK</button></div>
-    <div class="controls">WASD move · Space dash · Left click attack · Hold left click to charge, release to unleash · 1 2 3 cast spells · Esc pause<br>
-    Survive each floor, slay the giant checkered boss, get promoted, shop, repeat. Beat the King on Floor 6 to win.</div>
+    <div class="row"><button class="btn small" id="logBtn">✦ SPELL LOGBOOK</button><button class="btn small" id="lookBtn">♟ Switch to the chess theme</button></div>
+    <div class="controls"><span id="menuKeys">WASD move · Space dash · Left click attack · Hold left click to charge, release to unleash · 1–5 cast spells · Esc pause</span><br>
+    <span id="menuHint">Survive each floor, slay its boss, rise in rank, visit the merchants, repeat. Defeat the Tyrant King on Floor 6 to win.</span></div>
   </div>
 </div>
 
@@ -97,9 +106,9 @@ input{font:16px Georgia;padding:6px 10px;border-radius:6px;border:2px solid var(
 <div id="pause" class="overlay hidden">
   <div class="panel" style="max-width:420px;text-align:center">
     <h1 style="font-size:40px">PAUSED</h1>
-    <p class="sub">The board waits for your move.</p>
+    <p class="sub" id="pauseSub">Catch your breath, adventurer.</p>
     <button class="btn" id="resumeBtn">RESUME</button>
-    <button class="btn small" id="quitBtn">Resign (end run)</button>
+    <button class="btn small" id="quitBtn">Retreat (end run)</button>
   </div>
 </div>
 <div id="end" class="overlay hidden"></div>
@@ -125,6 +134,11 @@ function angDiff(a,b){let d=(a-b)%TAU;if(d>Math.PI)d-=TAU;if(d<-Math.PI)d+=TAU;r
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 /* ================= DATA ================= */
+// R55/R62: two looks. 'fantasy' (Magic Rush, the default) or 'chess' (the Round 3 Slaughtermate look).
+// Only drawing and text depend on it; gameplay and random numbers are the same in both.
+function loadLook(){try{return localStorage.getItem('slaughtermate_look')==='chess'?'chess':'fantasy';}catch(e){return 'fantasy';}}
+let LOOK=loadLook();
+const L=(f,c)=>LOOK==='chess'?c:f;   // the fantasy or the chess version of a text or style
 const WORLD=3200;
 // One theme per floor: board colours, building palette, how many castles/towns, hostile towers, maze.
 // Floor 3 (Midgame) keeps the Round 1 map exactly.
@@ -148,6 +162,30 @@ const FLOOR_THEMES=[
   stone:'#f4f0ff',stoneDark:'#140c1c',stoneLine:'#e0b84f',houseCols:['#2a1840'],roof:'#000000',accent:'#ffffff',gold:'#e0b84f',
   castles:0,towns:0,houses:[0,0],hostile:0,maze:true,pillars:14},
 ];
+// R59: the fantasy floors. They keep each chess floor's structure counts, towers and maze (copied
+// below), so the generator, the difficulty curve and R22-R25's layouts are unchanged; only the skin
+// (ground style, building art) and the decorations differ.
+const FANTASY_FLOORS=[
+ {name:'The Great Plains',sub:'Gnome villages dot the rolling grass',ground:'grass',tileA:'#7cbf5a',tileB:'#5fa448',bg:'#16301a',border:'#2e5a26',edge:'#e0b84f',
+  stone:'#c2b9a4',stoneDark:'#8f8673',stoneLine:'#5c5444',houseCols:['#efe0b8','#f4e8c8','#e6d3a6'],roof:'#c0392b',house:'gnome',
+  deco:{tree:46,gnome:10,flowers:70}},
+ {name:'The Old Village',sub:'Wooden houses lean over grassy lanes',ground:'grass',tileA:'#6aa64a',tileB:'#9a8452',bg:'#142614',border:'#3a2a14',edge:'#e0b84f',
+  stone:'#8a5e36',stoneDark:'#5e3e22',stoneLine:'#3a2410',houseCols:['#8a5a32','#7a4e2a','#9a6a3a','#86603c'],roof:'#4a2a14',house:'wood',
+  deco:{tree:30,well:6,hay:20,flowers:30}},
+ {name:'The Magic School',sub:'Endless shelves in the azure library',ground:'library',tileA:'#2f6fb8',tileB:'#255a99',bg:'#0b1a33',border:'#13284d',edge:'#e0b84f',
+  stone:'#6f92d0',stoneDark:'#46679f',stoneLine:'#1f3566',houseCols:['#6b3e22','#5a3418','#7a4a28'],roof:'#2b1608',house:'shelf',
+  deco:{shelf:18,desk:16,rug:8}},
+ {name:'The Dragon Ruins',sub:'Gems glitter among the broken stones',ground:'stone',tileA:'#8a8a88',tileB:'#6f6f70',bg:'#1a1a1c',border:'#2a2a2c',edge:'#c9a24a',
+  stone:'#9a968c',stoneDark:'#6e6a62',stoneLine:'#3e3b36',houseCols:['#8c877c','#7c776c','#958f82'],roof:'#4a4640',house:'ruin',
+  deco:{ruin:22,gem:28,bones:10}},
+ {name:'The Royal Witch Swamp',sub:'The castle looms beyond the marsh',ground:'swamp',tileA:'#3f6b35',tileB:'#2a4a3a',bg:'#0c1a10',border:'#14281a',edge:'#9be04a',
+  stone:'#56645a',stoneDark:'#3b473f',stoneLine:'#1e2620',houseCols:['#4a3a2a','#3e3022','#54402c'],roof:'#1e1410',house:'witchhut',
+  deco:{reeds:44,pool:18,deadtree:14}},
+ {name:'The Evil King\'s Castle',sub:'Find the Tyrant King in his halls',ground:'castle',tileA:'#141014',tileB:'#221a22',bg:'#050305',border:'#000000',edge:'#e0b84f',
+  stone:'#2a2228',stoneDark:'#120c10',stoneLine:'#e0b84f',houseCols:['#2a1418'],roof:'#000000',accent:'#e0b84f',gold:'#e0b84f',carpet:'#8a1020',house:'wood',
+  deco:{statue:14,banner:18}},
+].map((t,i)=>Object.assign(t,{castles:FLOOR_THEMES[i].castles,towns:FLOOR_THEMES[i].towns,houses:FLOOR_THEMES[i].houses,
+  hostile:FLOOR_THEMES[i].hostile,maze:FLOOR_THEMES[i].maze,pillars:FLOOR_THEMES[i].pillars}));
 // Enemy stat multipliers per difficulty (R27). Normal is the Round 1 balance.
 const DIFFICULTY={
  easy:{name:'Easy',hp:0.7,dmg:0.65,proj:0.9,score:0.75},
@@ -161,9 +199,9 @@ const TIER_NAME=['','Tier 1','Tier 2','Tier 3','Tier 4','Tier 5','Grandmaster'];
 const EL_COL={fire:'#ff6a2b',ice:'#7fd8ff',lightning:'#ffe14d',earth:'#c09060',wind:'#b9f5d0',nature:'#5fd068',poison:'#9be04a',arcane:'#c77dff',light:'#fff3a0',sun:'#c8231e',moon:'#c9d6ff',darkness:'#8a3fd0',tech:'#3ef0e0',hyper:'#ff3ec8',mind:'#ff7799',grandmaster:'#ff4fd8'};
 // R36-R45: each element's own particle shape (replacing plain coloured sparkles) and area-effect style.
 const EL_PART={fire:'flame',sun:'crescent',ice:'flake',poison:'skull',lightning:'zap',arcane:'shape',hyper:'piece',tech:'pixel',
- mind:'circle',moon:'star',light:'streak',darkness:'wisp',nature:'leaf',wind:'cloud',earth:'debris'};
+ mind:'circle',moon:'star',light:'streak',darkness:'wisp',nature:'leaf',wind:'cloud',earth:'rock'};   // earth: rocks and cracks (R66)
 const EL_AREA={fire:'fire',sun:'domain',ice:'ice',poison:'puddle',lightning:'storm',arcane:'portal',tech:'grid',mind:'warp',
- moon:'night',darkness:'void',nature:'vines',wind:'fog',hyper:'plain',light:'plain',earth:'plain'};
+ moon:'night',darkness:'void',nature:'vines',wind:'fog',hyper:'plain',light:'plain',earth:'solid'};
 const FORMS=['pawn','knight','bishop','rook','queen','king'];
 const FORM_NAMES=['Pawn','Knight','Bishop','Rook','Queen','King'];
 const FORM_BONUS=[null,
@@ -173,6 +211,16 @@ const FORM_BONUS=[null,
  {txt:'+20% weapon & spell damage, +8% speed',fn:()=>{P.dmgMult+=0.2;P.spellMult+=0.2;P.speed*=1.08;}},
  {txt:'+40 max HP, +2 HP/s regen, +10% crit',fn:()=>{P.maxHp+=40;P.regen+=2;P.crit+=0.1;}},
 ];
+// R56: the player's look follows the weapon class; promotion (R6) becomes a rank per class.
+const CLASS_OF={sword:'knight',hammer:'knight',shield:'knight',club:'knight',scythe:'knight',tome:'wizard',staff:'wizard',bow:'archer'};
+const RANKS={knight:['Squire','Knight','Knight-Captain','Paladin','Lord Paladin','Champion'],
+ wizard:['Novice','Adept','Mage','Magus','Archmage','Grand Archmage'],
+ archer:['Scout','Ranger','Marksman','Sharpshooter','Master Archer','Legendary Archer']};
+const playerClass=()=>CLASS_OF[G.weapon]||'knight';
+const rankName=()=>L(RANKS[playerClass()][P.form],FORM_NAMES[P.form]);
+// R57/R58: fantasy looks for the piece types (the AI keeps the chess type names internally).
+const ENEMY_LOOK={pawn:'goblin',knight:'skeleton',bishop:'apprentice',rook:'minotaur',queen:'witch',king:'guard'};
+const BOSS_LOOK={pawn:'goblinChief',knight:'evilPrince',bishop:'redMage',rook:'redDragon',queen:'witchQueen',king:'tyrantKing'};
 const WEAPONS={
  sword:{name:'Sword',ico:'⚔',dmg:24,cd:0.36,charge:0.8,desc:'Balanced melee. Quick arcing slashes.',cdesc:'Spin Slash: hits everything around you.'},
  bow:{name:'Bow',ico:'➶',dmg:19,cd:0.40,charge:0.9,desc:'Long-range arrows that pierce one foe.',cdesc:'Great Arrow: pierces the entire line.'},
@@ -273,8 +321,21 @@ const GM_SPELLS=[
   desc:'A black-and-white domain swallows the board. Phantom chess pieces dance around it, feeding an orb that bursts with ruinous force and leaves every survivor weakened.'},
  {id:'inversion',name:'Mental Inversion',tier:6,el:'grandmaster',col:'#ff4fd8',kind:'inversion',dmg:900,r:620,dur:10,boom:600,cd:40,
   desc:'A pulse turns every piece it touches against its own side for 10s, and each enemy they take explodes. Bosses resist the control but take 900 psychic damage.'},
- {id:'seal',name:'Grand Seal',tier:6,el:'grandmaster',col:'#9d7bff',kind:'seal',dmg:2600,r:560,freeze:3,cd:45,
-  desc:'Chains ring a vast area and five portals drag the swarm in, then the seal detonates and freezes everything inside.'},
+ {id:'seal',name:'Grand Seal',tier:6,el:'grandmaster',col:'#dc143c',kind:'seal',dmg:2600,r:560,freeze:3,cd:45,
+  desc:'Four crimson glyphs form a vast square and chain themselves to a great portal that drags the swarm in, then the seal detonates and freezes everything inside.'},
+ // Round 4 (R70-R75)
+ {id:'doom',name:'Doom Desire',tier:6,el:'grandmaster',col:'#9aa0aa',kind:'doom',dmg:520,mark:30,r:900,hits:4,pr:150,delay:5,cd:44,
+  desc:'A thin line of doom strikes every enemy on screen, marking and slowing it. Five seconds later, pillars of grey magic smite each marked foe again and again.'},
+ {id:'slumber',name:'Sweet Slumber',tier:6,el:'grandmaster',col:'#ffb3f0',kind:'slumber',dmg:2400,r:520,pull:330,dur:3,sleep:7,cd:44,
+  desc:'A gale of fairy magic drags the swarm into a vortex where fairy outlines gather. After 3 seconds they crack and explode, and the survivors fall asleep for 7 seconds.'},
+ {id:'nightfog',name:'Fog of the Nightmare',tier:6,el:'grandmaster',col:'#6a4a8a',kind:'nightfog',dmg:180,r:520,dur:12,cd:46,
+  desc:'Pitch-black fog billows around you for 12 seconds. Hands in the fog keep grabbing every enemy inside, and any foe that strikes you from outside is wrapped in fog of its own.'},
+ {id:'calamity',name:'Artificial Calamity',tier:6,el:'grandmaster',col:'#3ef0e0',kind:'calamity',dmg:3600,r:600,fuse:8,cd:48,
+  desc:'Summons a cruel reactor from the future that slows everything around it. After 8 seconds it malfunctions and explodes, and every survivor in the blast is turned into a goblin.'},
+ {id:'hellfire',name:'Hellfire',tier:6,el:'grandmaster',col:'#dc143c',kind:'hellfire',dmg:1400,boomR:170,pit:4,r:900,cd:40,
+  desc:'Crimson fireballs sweep in from the edge of sight, first across, then down. Each explodes on the first enemy it touches and leaves a burning pit of fire.'},
+ {id:'excalibur',name:'Excalibur',tier:6,el:'grandmaster',col:'#ffd84a',kind:'excalibur',dmg:3200,quake:900,r:600,len:1600,w:200,cd:42,
+  desc:'The legendary sword falls from the heavens and plants itself with a shockwave, then unleashes a colossal beam of light in the direction you aimed.'},
 ];
 const GM_PRICE=900;
 const GM_ODDS=[0,0,0,0.02,0.035,0.05];   // chance per reward card from floor 4 on; G.gmPity adds 0.3% per miss
@@ -313,13 +374,14 @@ const SPAWN_W=[
  {pawn:40,knight:20,bishop:15,rook:15,queen:7,king:3},
 ];
 const BOSSES=[
- {type:'pawn',name:'Iron Pawn',hp:2300,dmg:20,speed:75,r:40,s:42},
- {type:'knight',name:'Mad Knight',hp:4200,dmg:26,speed:85,r:42,s:44},
- {type:'bishop',name:'Cardinal Bishop',hp:6400,dmg:28,speed:70,r:42,s:46},
- {type:'rook',name:'Siege Rook',hp:9500,dmg:34,speed:60,r:48,s:48},
- {type:'queen',name:'Black Queen',hp:13000,dmg:36,speed:95,r:44,s:50},
- {type:'king',name:'Checkered King',hp:18500,dmg:42,speed:55,r:50,s:54},
+ {type:'pawn',name:'Iron Pawn',fname:'Goblin Chief',hp:2300,dmg:20,speed:75,r:40,s:42},
+ {type:'knight',name:'Mad Knight',fname:'Evil Prince',hp:4200,dmg:26,speed:85,r:42,s:44},
+ {type:'bishop',name:'Cardinal Bishop',fname:'Red Mage',hp:6400,dmg:28,speed:70,r:42,s:46},
+ {type:'rook',name:'Siege Rook',fname:'Red Dragon',hp:9500,dmg:34,speed:60,r:48,s:48},
+ {type:'queen',name:'Black Queen',fname:'Witch Queen',hp:13000,dmg:36,speed:95,r:44,s:50},
+ {type:'king',name:'Checkered King',fname:'Tyrant King',hp:18500,dmg:42,speed:55,r:50,s:54},
 ];
+const bossName=B=>L(B.fname,B.name);
 const BOSS_ATTACKS={
  pawn:['stomp','summon','ring','march'],
  knight:['leap','leap3','ring','summon'],
@@ -364,12 +426,174 @@ function drawPiece(type,x,y,s,o){
 }
 function shadow(x,y,s,a){ctx.fillStyle=`rgba(0,0,0,${a||0.28})`;ctx.beginPath();ctx.ellipse(x,y+1,s*0.95,s*0.32,0,0,TAU);ctx.fill();}
 
+/* ================= FANTASY ART (R55-R61) ================= */
+// Simple figures built from ellipses, polygons and lines, in the same units as the chess pieces:
+// feet at (0,0), about 2.4 units tall, facing right. o: {flip, rot, sx, sy, glow, tint, rank, flap}.
+let FT=null;                                  // tint colour that replaces every body colour (hit flash, frozen)
+const FC=c=>FT||c;
+function fe(x,y,rx,ry,c,ns){ctx.fillStyle=FC(c);ctx.beginPath();ctx.ellipse(x,y,Math.abs(rx),Math.abs(ry),0,0,TAU);ctx.fill();if(!ns)ctx.stroke();}
+function fp(pts,c,ns){ctx.fillStyle=FC(c);ctx.beginPath();pts.forEach(([a,b],i)=>i?ctx.lineTo(a,b):ctx.moveTo(a,b));ctx.closePath();ctx.fill();if(!ns)ctx.stroke();}
+function fr(x,y,w,h,c){ctx.fillStyle=FC(c);ctx.fillRect(x,y,w,h);ctx.strokeRect(x,y,w,h);}
+function fl(pts,c,w){const lw=ctx.lineWidth,ss=ctx.strokeStyle;ctx.strokeStyle=FC(c);ctx.lineWidth=w;ctx.beginPath();pts.forEach(([a,b],i)=>i?ctx.lineTo(a,b):ctx.moveTo(a,b));ctx.stroke();ctx.lineWidth=lw;ctx.strokeStyle=ss;}
+function fd(x,y,r,c){ctx.fillStyle=FT||c;ctx.beginPath();ctx.arc(x,y,Math.abs(r),0,TAU);ctx.fill();}   // dots: eyes, studs
+function crownPts(x,y,w,h){return [[x-w,y],[x-w*1.1,y-h],[x-w*0.5,y-h*0.55],[x,y-h*1.2],[x+w*0.5,y-h*0.55],[x+w*1.1,y-h],[x+w,y]];}
+// Rank upgrades for the player (R56): cape, plume, gold trim, pauldrons, crown.
+function rankBack(r,col){if(r>=1)fp([[-0.3,-1.4],[0.15,-1.4],[-0.2,-0.15],[-0.75,-0.1]],r>=3?'#8a1a2a':col);}
+function rankFront(r,headY,headR){
+ if(r>=3){const lw=ctx.lineWidth;ctx.strokeStyle=FC('#e0b84f');ctx.lineWidth=0.08;ctx.beginPath();ctx.ellipse(0,-1.0,0.44,0.49,0,0,TAU);ctx.stroke();ctx.lineWidth=lw;ctx.strokeStyle='#1a1410';}
+ if(r>=4){fe(-0.38,-1.34,0.2,0.13,'#e0b84f');fe(0.36,-1.34,0.2,0.13,'#e0b84f');}
+ if(r>=2&&r<5)fe(-0.12,headY-headR-0.18,0.1,0.26,'#d02030');
+ if(r>=5)fp(crownPts(0.03,headY-headR+0.06,0.26,0.3),'#ffd84a');
+}
+const FIG={
+ // ---- player classes ----
+ knight(o){const r=o.rank||0;rankBack(r,'#2a4a8a');
+  fr(-0.32,-0.5,0.24,0.5,'#7a7f8a');fr(0.08,-0.5,0.24,0.5,'#7a7f8a');
+  fe(0,-1.0,0.44,0.5,'#c8ccd6');fr(-0.4,-0.72,0.8,0.1,'#6b4a2a');
+  fe(0.04,-1.64,0.34,0.36,'#d6dae2');fl([[0.08,-1.66],[0.36,-1.66]],'#20242c',0.08);fl([[0.22,-1.82],[0.22,-1.5]],'#20242c',0.05);
+  rankFront(r,-1.64,0.36);},
+ wizard(o){const r=o.rank||0;rankBack(r,'#5a2a8a');
+  fp([[-0.55,0],[0.55,0],[0.3,-1.35],[-0.3,-1.35]],'#2a3f9a');
+  for(const [a,b] of [[-0.2,-0.4],[0.2,-0.8],[-0.05,-1.1],[0.25,-0.25]])fd(a,b,0.05,'#ffe680');
+  if(r>=3)fl([[-0.55,-0.04],[0.55,-0.04]],'#e0b84f',0.1);
+  fe(0.06,-1.55,0.27,0.27,'#f0c8a0');fp([[-0.12,-1.45],[0.3,-1.45],[0.12,-0.95]],'#f4f4f4');fd(0.16,-1.6,0.04,'#222');
+  fe(0.02,-1.8,0.5,0.1,'#22348a');fp([[-0.3,-1.8],[0.34,-1.8],[-0.1,-2.6]],'#22348a');fl([[-0.27,-1.86],[0.3,-1.86]],'#e0b84f',0.07);
+  if(r>=4){fe(-0.32,-1.3,0.18,0.12,'#e0b84f');fe(0.32,-1.3,0.18,0.12,'#e0b84f');}
+  if(r>=2&&r<5)fe(0.28,-2.05,0.07,0.22,'#d02030');
+  if(r>=5)fp(crownPts(0.02,-1.85,0.24,0.26),'#ffd84a');},
+ archer(o){const r=o.rank||0;rankBack(r,'#3a5a2a');
+  fr(-0.5,-1.45,0.22,0.75,'#6b4a2a');fl([[-0.42,-1.45],[-0.5,-1.75]],'#e8e0d0',0.06);fl([[-0.34,-1.45],[-0.3,-1.78]],'#e8e0d0',0.06);   // quiver
+  fr(-0.3,-0.5,0.22,0.5,'#5a3a1e');fr(0.08,-0.5,0.22,0.5,'#5a3a1e');
+  fe(0,-1.0,0.4,0.48,'#3f7a32');fr(-0.38,-0.75,0.76,0.09,'#6b4a2a');
+  fe(0.05,-1.6,0.28,0.29,'#f0c8a0');fp([[-0.34,-1.5],[-0.1,-2.05],[0.32,-1.78],[0.36,-1.55],[0.12,-1.85],[-0.2,-1.45]],'#2f6a28');fd(0.18,-1.6,0.04,'#222');
+  rankFront(r,-1.62,0.3);},
+ // ---- enemies (R57) ----
+ goblin(){fr(-0.3,-0.45,0.22,0.45,'#4a7a2a');fr(0.08,-0.45,0.22,0.45,'#4a7a2a');
+  fe(0,-0.8,0.48,0.42,'#7a5230');fe(0.05,-1.42,0.46,0.42,'#6fae3e');
+  fp([[-0.3,-1.52],[-0.95,-1.8],[-0.38,-1.28]],'#6fae3e');fp([[0.38,-1.55],[0.98,-1.82],[0.44,-1.3]],'#6fae3e');
+  fd(0.12,-1.48,0.08,'#ffe14d');fd(0.32,-1.48,0.08,'#ffe14d');fd(0.12,-1.48,0.035,'#111');fd(0.32,-1.48,0.035,'#111');
+  fl([[0.45,-0.8],[0.95,-1.15]],'#c8c8d0',0.12);},
+ skeleton(){const B='#e8e2cc';fl([[-0.18,-0.55],[-0.25,0]],B,0.13);fl([[0.18,-0.55],[0.25,0]],B,0.13);
+  fe(0,-1.0,0.36,0.42,B);fl([[-0.28,-1.1],[0.28,-1.1]],'#5a5040',0.05);fl([[-0.3,-0.95],[0.3,-0.95]],'#5a5040',0.05);fl([[-0.26,-0.8],[0.26,-0.8]],'#5a5040',0.05);
+  fl([[0.3,-1.15],[0.6,-0.85]],B,0.1);fe(0.05,-1.65,0.36,0.34,B);fr(-0.1,-1.42,0.32,0.14,B);
+  fd(-0.06,-1.68,0.09,'#201818');fd(0.2,-1.68,0.09,'#201818');fd(0.2,-1.68,0.035,'#ff5050');
+  fl([[0.55,-0.9],[1.1,-1.35]],'#a0a0a8',0.1);},
+ apprentice(){fp([[-0.55,0],[0.55,0],[0.28,-1.3],[-0.28,-1.3]],'#3d5bb5');fr(-0.4,-0.7,0.8,0.08,'#e0b84f');
+  fe(0.05,-1.52,0.28,0.28,'#f0c8a0');fd(0.16,-1.55,0.04,'#222');
+  fe(0.02,-1.72,0.48,0.1,'#2f4aa0');fp([[-0.3,-1.72],[0.34,-1.72],[0.05,-2.5]],'#2f4aa0');
+  fl([[0.45,-0.8],[0.75,-1.5]],'#6b4a2a',0.07);fd(0.77,-1.56,0.12,'#9fd8ff');},
+ minotaur(){fr(-0.42,-0.55,0.3,0.55,'#4a2a16');fr(0.12,-0.55,0.3,0.55,'#4a2a16');
+  fe(0,-1.05,0.68,0.62,'#7a4a2a');fe(0.08,-1.0,0.36,0.36,'#9a6a46',true);
+  fe(0.2,-1.86,0.42,0.38,'#6b3e22');fe(0.5,-1.76,0.22,0.17,'#c49a7a');
+  fp([[-0.05,-2.08],[-0.42,-2.55],[-0.12,-2.0]],'#efe6c8');fp([[0.36,-2.14],[0.5,-2.66],[0.52,-2.06]],'#efe6c8');
+  fd(0.3,-1.94,0.06,'#ff3030');fl([[0.56,-1.68],[0.58,-1.58]],'#e0b84f',0.06);
+  fl([[0.62,-0.5],[0.92,-1.95]],'#6b4a2a',0.12);fp([[0.86,-1.95],[1.32,-2.15],[1.28,-1.55],[0.88,-1.62]],'#b0b0b8');},
+ witch(){fp([[-0.6,0],[0.6,0],[0.28,-1.3],[-0.28,-1.3]],'#3a1f4f');fl([[0.4,-0.7],[0.9,-0.15]],'#6b4a2a',0.08);
+  fe(0.05,-1.52,0.28,0.28,'#8fd06a');fp([[0.28,-1.55],[0.48,-1.45],[0.28,-1.42]],'#8fd06a');fd(0.16,-1.58,0.04,'#ff3030');
+  fe(0,-1.74,0.62,0.12,'#1c1424');fp([[-0.33,-1.74],[0.33,-1.74],[-0.2,-2.72]],'#1c1424');fl([[-0.3,-1.82],[0.3,-1.82]],'#9b51e0',0.08);},
+ guard(){fr(-0.3,-0.5,0.22,0.5,'#7a7f8a');fr(0.08,-0.5,0.22,0.5,'#7a7f8a');
+  fe(0,-1.0,0.45,0.5,'#b8bcc8');fr(-0.24,-1.32,0.48,0.88,'#b0202a');fl([[0,-1.3],[0,-0.48]],'#e0b84f',0.08);
+  fe(0.05,-1.64,0.33,0.34,'#c8ccd6');fl([[0.1,-1.66],[0.36,-1.66]],'#20242c',0.08);fe(-0.12,-2.05,0.12,0.26,'#d02030');
+  fl([[0.6,0],[0.6,-2.6]],'#6b4a2a',0.09);fp([[0.6,-2.6],[0.82,-2.35],[0.6,-2.2]],'#c8ccd6');},
+ // ---- bosses (R58) ----
+ goblinChief(){fe(0,-0.82,0.62,0.5,'#8a5a2a');FIG.goblin();
+  fp([[-0.42,-1.78],[-0.34,-2.32],[-0.12,-1.92],[0.04,-2.45],[0.2,-1.92],[0.42,-2.32],[0.46,-1.78]],'#efe6c8');
+  fl([[0.05,-1.36],[0.4,-1.36]],'#c0392b',0.06);fl([[0.5,-0.7],[1.05,-1.5]],'#6b4a2a',0.16);fe(1.1,-1.62,0.22,0.3,'#7a5530');},
+ evilPrince(){fp([[-0.25,-1.45],[0.2,-1.45],[-0.25,-0.05],[-0.85,0]],'#6a0d1a');
+  fr(-0.3,-0.5,0.22,0.5,'#1c1820');fr(0.08,-0.5,0.22,0.5,'#1c1820');fe(0,-1.0,0.42,0.5,'#2a2430');fl([[-0.3,-1.25],[0.3,-0.75]],'#e0b84f',0.07);
+  fe(0.05,-1.6,0.29,0.3,'#f2dccc');fe(-0.05,-1.8,0.32,0.15,'#1a1418');fp(crownPts(0.03,-1.86,0.2,0.18),'#e0b84f');fd(0.17,-1.62,0.045,'#d01010');
+  fl([[0.45,-0.95],[1.2,-1.5]],'#d8dce6',0.07);fl([[0.42,-1.05],[0.5,-0.85]],'#e0b84f',0.1);},
+ redMage(){fp([[-0.62,0],[0.62,0],[0.3,-1.35],[-0.3,-1.35]],'#b0201e');fr(-0.45,-0.72,0.9,0.09,'#e0b84f');
+  fe(0.05,-1.55,0.28,0.28,'#2a1010');fd(0.0,-1.56,0.05,'#ffd24a');fd(0.18,-1.56,0.05,'#ffd24a');
+  fe(0,-1.78,0.78,0.14,'#8a1414');fp([[-0.36,-1.78],[0.36,-1.78],[0.1,-2.5],[0.45,-2.8],[-0.05,-2.55]],'#8a1414');
+  fl([[0.55,0],[0.75,-2.0]],'#4a2a14',0.09);fd(0.77,-2.1,0.18,'#ff6a2b');fd(0.77,-2.1,0.08,'#ffd24a');},
+ redDragon(o){const fpw=o.flap||0;
+  fp([[-0.8,-0.85],[-1.65,-0.45],[-1.8,-0.8],[-0.85,-1.15]],'#9a1e18');
+  fp([[-0.25,-1.25],[-1.0,-2.3-fpw*0.4],[-0.55,-1.9-fpw*0.2],[-0.3,-2.35-fpw*0.4],[0.1,-1.35]],'#7a1410');
+  fr(-0.5,-0.45,0.22,0.45,'#8a1a14');fr(0.25,-0.45,0.22,0.45,'#8a1a14');
+  fe(-0.1,-0.9,0.82,0.52,'#b3261e');fe(0.05,-0.75,0.5,0.28,'#e8b060',true);
+  fp([[0.4,-1.1],[0.72,-1.85],[0.98,-1.72],[0.72,-0.95]],'#b3261e');fe(1.0,-1.9,0.34,0.22,'#b3261e');fe(1.28,-1.84,0.16,0.12,'#a01e18');
+  fp([[0.85,-2.05],[0.7,-2.4],[0.95,-2.1]],'#efe6c8');fp([[1.05,-2.08],[1.0,-2.42],[1.18,-2.1]],'#efe6c8');fd(1.08,-1.96,0.05,'#ffd24a');
+  fp([[0.1,-1.3],[0.4,-2.4-fpw*0.4],[0.55,-1.85],[0.9,-2.1-fpw*0.3],[0.55,-1.2]],'#8a1a14');},
+ witchQueen(){fp([[-0.7,0],[0.7,0],[0.3,-1.35],[-0.3,-1.35]],'#4b1f6b');fl([[-0.68,-0.05],[0.68,-0.05]],'#e0b84f',0.08);fr(-0.3,-0.75,0.6,0.08,'#9be04a');
+  fe(0.05,-1.52,0.29,0.29,'#8fd06a');fd(0.17,-1.58,0.045,'#ff3030');
+  fe(0,-1.74,0.68,0.13,'#1c1424');fp([[-0.35,-1.74],[0.35,-1.74],[-0.2,-2.8]],'#1c1424');fp(crownPts(-0.02,-2.0,0.24,0.24),'#e0b84f');
+  fl([[0.6,0],[0.75,-2.1]],'#2a1a10',0.09);fd(0.76,-2.2,0.16,'#9be04a');},
+ tyrantKing(){fp([[-0.3,-1.5],[0.25,-1.5],[-0.3,-0.05],[-0.95,0]],'#8a1020');
+  fr(-0.34,-0.5,0.26,0.5,'#1c1c22');fr(0.08,-0.5,0.26,0.5,'#1c1c22');fe(0,-1.02,0.5,0.55,'#1c1c22');fr(-0.22,-1.35,0.44,0.86,'#8a1020');fl([[0,-1.33],[0,-0.5]],'#e0b84f',0.09);
+  fe(-0.4,-1.38,0.2,0.13,'#e0b84f');fe(0.4,-1.38,0.2,0.13,'#e0b84f');
+  fe(0.04,-1.68,0.32,0.34,'#2a2a32');fl([[0.08,-1.7],[0.34,-1.7]],'#ff3030',0.07);fp(crownPts(0.03,-1.92,0.3,0.4),'#e0b84f');
+  fl([[0.55,-0.6],[1.0,-2.2]],'#d8dce6',0.12);fl([[0.45,-0.85],[0.75,-0.7]],'#e0b84f',0.12);},
+ merchant(){fr(-0.6,-1.35,0.35,0.6,'#6b4a2a');   // backpack
+  fp([[-0.5,0],[0.5,0],[0.3,-1.3],[-0.3,-1.3]],'#8a5a32');fr(-0.38,-0.75,0.76,0.08,'#3a2410');fd(0.32,-0.62,0.12,'#e0b84f');
+  fe(0.05,-1.52,0.27,0.27,'#f0c8a0');fp([[-0.1,-1.42],[0.28,-1.42],[0.1,-1.12]],'#a07050');fd(0.16,-1.56,0.04,'#222');
+  fe(0,-1.76,0.58,0.13,'#5a3a1e');fe(0,-1.9,0.3,0.2,'#5a3a1e');fe(0.22,-2.0,0.05,0.16,'#c0392b');},
+ gnome(){fp([[-0.3,0],[0.3,0],[0.2,-0.6],[-0.2,-0.6]],'#3a6ab0');fe(0,-0.75,0.2,0.2,'#f0c8a0');fp([[-0.18,-0.66],[0.2,-0.66],[0.02,-0.4]],'#f4f4f4');
+  fp([[-0.24,-0.85],[0.24,-0.85],[0,-1.5]],'#c0392b');},
+};
+function drawFigure(kind,x,y,s,o){
+ o=o||{};const f=FIG[kind];if(!f)return;
+ ctx.save();ctx.translate(x,y);if(o.rot)ctx.rotate(o.rot);
+ ctx.scale(s*(o.flip?-1:1)*(o.sx||1),s*(o.sy||1));ctx.lineJoin='round';ctx.lineCap='round';
+ if(o.glow){ctx.fillStyle=o.glow;ctx.beginPath();ctx.ellipse(0,-1.15,1.0,1.4,0,0,TAU);ctx.globalAlpha*=0.55;ctx.fill();ctx.globalAlpha/=0.55;}
+ ctx.strokeStyle=o.line||'#1a1410';ctx.lineWidth=(o.lw||1.3)/s;FT=o.tint||null;
+ f(o);FT=null;
+ ctx.restore();
+}
+// R64: a gold bar (the fantasy currency).
+function drawGoldBar(x,y,s,rot){
+ ctx.save();ctx.translate(x,y);if(rot)ctx.rotate(rot*0.4);
+ ctx.beginPath();ctx.moveTo(-s*1.1,s*0.55);ctx.lineTo(s*1.1,s*0.55);ctx.lineTo(s*0.7,-s*0.5);ctx.lineTo(-s*0.7,-s*0.5);ctx.closePath();
+ ctx.fillStyle='#e8b923';ctx.fill();ctx.strokeStyle='#6a4a08';ctx.lineWidth=1.4;ctx.stroke();
+ ctx.fillStyle='#ffe58a';ctx.fillRect(-s*0.55,-s*0.38,s*1.1,s*0.22);
+ ctx.fillStyle='#b8860b';ctx.beginPath();ctx.moveTo(s*0.7,-s*0.5);ctx.lineTo(s*1.1,s*0.55);ctx.lineTo(s*0.75,s*0.55);ctx.lineTo(s*0.5,-s*0.3);ctx.closePath();ctx.fill();
+ ctx.restore();
+}
+const GOLD_SVG='<svg class="goldbar" viewBox="0 0 16 11" aria-hidden="true"><polygon points="1,10 15,10 12,1 4,1" fill="#e8b923" stroke="#6a4a08"/><rect x="5" y="2.3" width="6" height="1.6" fill="#ffe58a"/></svg>';
+
+/* ---------- R65 spell icons: one per element, a crown for Grandmaster ---------- */
+// Each icon is a list of SVG path parts on a 24x24 grid, shared by the canvas HUD (Path2D) and the HTML cards.
+// f: filled in the spell colour, k: filled dark, s: stroked in the spell colour, w: stroke width.
+const ICONS={
+ fire:[{d:'M12 2C9 7 5 9 5 14.5a7 7 0 0 0 14 0c0-3-2-5.5-3.5-7.5-1 2.5-2 3.5-3.5 4 .5-3.5 0-6-0-9z',f:1},{d:'M12 13c-1.5 2-2.5 3-2.5 4.5a2.5 2.5 0 0 0 5 0c0-1.5-1-3-2.5-4.5z',k:'#ffe06a'}],
+ earth:[{d:'M2 21l3-8 5-2.5 3 4.5 1 6z',f:1},{d:'M12.5 21l2-7 5-2 3 6v3z',f:1},{d:'M6 15l2 2-1 2M17 15l-1 2.5',s:'#3a2410',w:1.2}],
+ sun:[{d:'M12 7a5 5 0 1 0 0.01 0z',f:1},{d:'M12 1v3.5M12 19.5V23M1 12h3.5M19.5 12H23M4.2 4.2l2.5 2.5M17.3 17.3l2.5 2.5M4.2 19.8l2.5-2.5M17.3 6.7l2.5-2.5',s:1,w:2.2}],
+ moon:[{d:'M15 2.5a9.5 9.5 0 1 0 7 15.5A7.5 7.5 0 0 1 15 2.5z',f:1}],
+ light:[{d:'M12 1L14.5 9.5L23 12L14.5 14.5L12 23L9.5 14.5L1 12L9.5 9.5Z',f:1}],
+ darkness:[{d:'M7 22v-8l-2.5-3.5c-1-1.6.8-2.8 2-1.3L8 11V4.2a1.3 1.3 0 0 1 2.6 0V10V3a1.3 1.3 0 0 1 2.6 0v7V4a1.3 1.3 0 0 1 2.6 0v7V6.5a1.3 1.3 0 0 1 2.6 0V15c0 4-2.5 7-5.5 7z',f:1}],
+ tech:[{d:'M12 2.5v9',s:1,w:2.6},{d:'M7 5.5a8 8 0 1 0 10 0',s:1,w:2.6}],
+ ice:[{d:'M12 2v20M3.3 7l17.4 10M3.3 17l17.4-10M9 3.5l3 2.5 3-2.5M9 20.5l3-2.5 3 2.5M3.5 10.5l3-.5-1-3M20.5 13.5l-3 .5 1 3M3.5 13.5l3 .5-1 3M20.5 10.5l-3-.5 1-3',s:1,w:1.8}],
+ nature:[{d:'M12 1.5L5 10.5h3l-4.5 6.5h7.5v5.5h2V17H20.5L16 10.5h3z',f:1},{d:'M11 17h2v5.5h-2z',k:'#6b4a2a'}],
+ hyper:[{d:'M3.5 7.5a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0-7 0z',f:1},{d:'M17 3l4.5 7.5h-9z',f:1},{d:'M8.5 14h7v7h-7z',f:1}],
+ arcane:[{d:'M12 12a1.5 1.5 0 0 1 3 0a3 3 0 0 1-6 0a4.5 4.5 0 0 1 9 0a6 6 0 0 1-12 0a7.5 7.5 0 0 1 15 0',s:1,w:2}],
+ wind:[{d:'M2 4h20M4.5 8.5h15M7 13h10.5M9 17.5h7M11 21.5h3.5',s:1,w:2.4}],
+ lightning:[{d:'M6.5 13.5a4.2 4.2 0 0 1-.3-8.4 6 6 0 0 1 11.4 1.4 3.6 3.6 0 0 1 .6 7z',f:1},{d:'M12.5 11.5l-3.5 6h3l-2 5.5 6.5-8h-3.2l2.2-3.5z',k:'#ffe14d'}],
+ mind:[{d:'M1.5 12C5.5 5 18.5 5 22.5 12C18.5 19 5.5 19 1.5 12Z',s:1,w:2},{d:'M12 8.2a3.8 3.8 0 1 0 0.01 0z',f:1},{d:'M12 10.6a1.4 1.4 0 1 0 0.01 0z',k:'#111'}],
+ poison:[{d:'M12 2a8 8 0 0 0-8 8c0 3 1.5 5 3 6v3.5h10V16c1.5-1 3-3 3-6a8 8 0 0 0-8-8z',f:1},{d:'M8.7 9.3a1.9 1.9 0 1 0 0.01 0zM15.3 9.3a1.9 1.9 0 1 0 0.01 0zM12 13l-1.2 2.3h2.4z',k:'#111'},{d:'M10 17v2.5M12 17v2.5M14 17v2.5',s:'#111',w:1}],
+ grandmaster:[{d:'M2 18L3.5 6.5l5 5L12 4l3.5 7.5 5-5L22 18z',f:1},{d:'M2.5 19.2h19v3h-19z',f:1},{d:'M12 13a1.6 1.6 0 1 0 0.01 0z',k:'#fff'}],
+};
+const spellIcon=d=>d.tier===6?'grandmaster':d.el;
+const ICON_P2D={};
+function drawIcon(key,x,y,size,col){
+ const parts=ICONS[key]||ICONS.arcane;ctx.save();ctx.translate(x-size/2,y-size/2);ctx.scale(size/24,size/24);ctx.lineCap='round';ctx.lineJoin='round';
+ parts.forEach((p,i)=>{const k=key+i,path=ICON_P2D[k]||(ICON_P2D[k]=new Path2D(p.d));
+  if(p.f){ctx.fillStyle=col;ctx.fill(path);ctx.strokeStyle='#111';ctx.lineWidth=1;ctx.stroke(path);}
+  else if(p.k){ctx.fillStyle=p.k;ctx.fill(path);}
+  if(p.s){ctx.strokeStyle=p.s===1?col:p.s;ctx.lineWidth=p.w||2;ctx.stroke(path);}});
+ ctx.restore();
+}
+function iconSVG(key,size,col){
+ col=col||'#888';const parts=ICONS[key]||ICONS.arcane;
+ return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" aria-hidden="true" style="filter:drop-shadow(0 0 1px #000)">'+parts.map(p=>
+  '<path d="'+p.d+'" fill="'+(p.f?col:p.k||'none')+'" stroke="'+(p.s?(p.s===1?col:p.s):p.f?'#111':'none')+'" stroke-width="'+(p.s?(p.w||2):1)+'" stroke-linecap="round" stroke-linejoin="round"/>').join('')+'</svg>';
+}
+
 /* ================= INPUT ================= */
 const keys={},mouse={x:0,y:0,down:false};
 addEventListener('keydown',e=>{
  const k=e.key.toLowerCase();keys[k]=true;
  if(G.state==='play'){
-  if(k==='1'||k==='2'||k==='3')castSpell(+k-1);
+  if(k.length===1&&k>='1'&&k<='5')castSpell(+k-1);   // 1-5 (R76)
   if(k===' '||e.code==='Space'){e.preventDefault();dash();}
   if(k==='escape'||k==='p')setPaused(true);
  }else if(G.state==='paused'&&(k==='escape'||k==='p'))setPaused(false);
@@ -386,7 +610,7 @@ const cam={x:0,y:0};
 const mouseWorld=()=>({x:mouse.x+cam.x,y:mouse.y+cam.y});
 
 /* ================= MAP ================= */
-const themeFor=f=>FLOOR_THEMES[clamp((f||1)-1,0,FLOOR_THEMES.length-1)];
+const themeFor=f=>L(FANTASY_FLOORS,FLOOR_THEMES)[clamp((f||1)-1,0,FLOOR_THEMES.length-1)];
 function genMap(floor){
  const T=themeFor(floor),S=[],C=WORLD/2;
  const ok=(x,y,w,h,m)=>{
@@ -422,6 +646,20 @@ function genMap(floor){
   const x=rand(200,WORLD-240),y=rand(200,WORLD-240);if(ok(x,y,40,40,70)){S.push({x,y,w:40,h:40,k:'pillar'});n++;}
  }
  return S;
+}
+// R59: decorations (trees, gnomes, wells, shelves, gems, reeds, statues...). They don't block movement.
+// They use their own generator seeded from the layout and never touch Math.random(), so the game's
+// random sequence (and so gameplay) is exactly what it was in Round 3, whichever theme is on.
+function genDecor(floor,S){
+ let a=(floor*7919+S.reduce((t,q)=>t+Math.round(q.x*3+q.y),0))>>>0;const R=()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
+ const T=FANTASY_FLOORS[clamp((floor||1)-1,0,5)],out=[],C=WORLD/2;
+ for(const k in T.deco)for(let n=0,i=0;n<T.deco[k]&&i<T.deco[k]*30;i++){
+  const x=80+R()*(WORLD-160),y=80+R()*(WORLD-160),m=k==='flowers'||k==='rug'||k==='pool'?0:18;
+  if(Math.hypot(x-C,y-C)<230)continue;
+  if(S.some(s=>x>s.x-m&&x<s.x+s.w+m&&y>s.y-m&&y<s.y+s.h+m))continue;
+  out.push({k,x,y,s:0.8+R()*0.5,h:R()});n++;
+ }
+ return out.sort((p,q)=>p.y-q.y);
 }
 // Slightly maze-like board: a random spanning-tree maze on an 8x8 grid of 400px rooms,
 // then about a third of the remaining walls are knocked out so there are loops and wide routes.
@@ -471,14 +709,15 @@ function insideStruct(x,y,r){for(const s of G.structs)if(x>s.x-r&&x<s.x+s.w+r&&y
 /* ================= STATE ================= */
 let G,P;
 function makeState(){
+ const S=genMap(1);
  return {state:'menu',time:0,runTime:0,floor:1,floorTime:0,phase:'wave',dur:75,enemies:[],pproj:[],eproj:[],hazards:[],pstrikes:[],zones:[],beams:[],orbs:[],
-  pickups:[],fx:[],parts:[],texts:[],timers:[],casts:[],dealt:0,structs:genMap(1),theme:FLOOR_THEMES[0],difficulty:'normal',clubBlasts:0,shake:0,score:0,kills:0,pity:0,bags:{1:[],2:[],3:[],4:[],5:[],6:[]},statBag:[],
+  pickups:[],fx:[],parts:[],texts:[],timers:[],casts:[],dealt:0,structs:S,decor:genDecor(1,S),corpses:[],theme:themeFor(1),difficulty:'normal',clubBlasts:0,shake:0,score:0,kills:0,pity:0,bags:{1:[],2:[],3:[],4:[],5:[],6:[]},statBag:[],
   pendingLevels:0,spawnAcc:0,packT:16,banner:null,boss:null,weapon:'sword',clearT:0,shop:null,cart:null,cartT:0,rituals:[],gmPity:0,screenFlash:null};
 }
 function xpFor(l){return Math.floor(6+l*3.5+l*l*0.15);}
 function makePlayer(w){
  const p={x:WORLD/2,y:WORLD/2,r:15,hp:100,maxHp:100,speed:230,form:0,level:1,xp:0,xpNext:xpFor(1),gold:0,dmgMult:1,spellMult:1,cdMult:1,atkSpeed:1,
-  armor:0,crit:0.05,magnet:110,regen:0,shield:0,shieldT:0,iframes:0,hurt:0,atkCd:0,holdT:0,charge:0,charging:false,aim:0,swingT:0,moving:false,spells:[null,null,null],
+  armor:0,crit:0.05,magnet:110,regen:0,shield:0,shieldT:0,iframes:0,hurt:0,atkCd:0,holdT:0,charge:0,charging:false,aim:0,swingT:0,moving:false,spells:[null,null,null,null,null],
   dashCd:0,dashT:0,dashA:0,rush:null,windup:0,windA:0,bashT:0,bashA:0};
  if(w==='staff')p.spellMult+=0.1;
  if(w==='hammer'){p.maxHp+=20;p.hp+=20;}
@@ -543,7 +782,7 @@ function debris(x,y,n,c,sp){sp=sp||1;for(let i=0;i<n;i++)particle('debris',x,y,c
 // Each shape gets the motion and size that suits it; drawn by PART_DRAW in drawParticles().
 function elPart(el,x,y,o){
  if(G.parts.length>=PART_CAP)return;o=o||{};
- const sh=EL_PART[el]||'spark',c=EL_COL[el]||'#fff',sp=o.sp||1,q={a:o.a,v:(o.v??rand(20,130))*sp};
+ const sh=el==='earth'&&Math.random()<0.4?'crack':EL_PART[el]||'spark',c=EL_COL[el]||'#fff',sp=o.sp||1,q={a:o.a,v:(o.v??rand(20,130))*sp};
  switch(sh){
   case 'flame':q.vy=-rand(50,110);q.sz=rand(3,7);q.dur=rand(0.35,0.7);break;
   case 'crescent':q.sz=Math.random()<0.5?rand(3,6):rand(9,16);q.dur=rand(0.5,0.9);break;   // large and small
@@ -559,6 +798,8 @@ function elPart(el,x,y,o){
   case 'wisp':q.sz=rand(5,8);q.vy=-rand(25,55);q.v*=0.5;q.dur=rand(0.6,1);break;
   case 'leaf':q.sz=rand(4,7);q.g=70;q.dur=rand(0.6,1);break;
   case 'cloud':q.sz=rand(6,11);q.v*=0.35;q.dur=rand(0.7,1.1);break;
+  case 'rock':q.v=(o.v??rand(80,240))*sp;q.vy=-rand(60,170)*sp;q.g=560;q.sz=rand(4,8);q.dur=rand(0.55,0.95);break;   // R66
+  case 'crack':q.v=rand(0,8);q.sz=rand(7,14);q.dur=rand(0.6,1);break;
   case 'debris':q.v=(o.v??rand(80,260))*sp;q.vy=-rand(60,180)*sp;q.g=520;q.sz=rand(3,7);q.dur=rand(0.5,0.9);break;
  }
  if(o.vy!==undefined)q.vy=o.vy;if(o.dur)q.dur=o.dur;if(o.sz)q.sz=o.sz;
@@ -570,6 +811,8 @@ function elPart(el,x,y,o){
  else if(sh==='streak'){p.len=rand(16,38)*(o.sp||1);p.spin=0;}
  else if(sh==='pixel'){p.x=Math.round(p.x/4)*4;p.y=Math.round(p.y/4)*4;p.spin=0;p.rot=0;}
  else if(sh==='zap')p.spin=0;
+ else if(sh==='crack'){p.spin=0;p.c='#3a2410';}
+ else if(sh==='rock'&&Math.random()<0.5)p.c='#8a6a48';
 }
 // White glints stay common to all spells (the only plain sparkles left on spells after Round 3).
 function glint(x,y,n,sp,spread){sp=sp||1;spread=spread||0;for(let i=0;i<n;i++){const a=rand(0,TAU),rr=spread*Math.sqrt(Math.random());
@@ -647,18 +890,40 @@ function damageRect(x,y,a,len,w,dmg,o){
 function damageLine(ax,ay,bx,by,w,dmg,o){
  for(const e of G.enemies){if(e.dead)continue;const rr=w/2+e.r;if(segDist2(e.x,e.y,ax,ay,bx,by)<rr*rr)hitEnemy(e,dmg,o);}
 }
-function damagePlayer(d){
+function damagePlayer(d,src){
  if(P.iframes>0||G.state!=='play'||G.phase==='cleared')return;
+ if(src&&!src.dead)fogRetaliate(src);   // R72: an attacker outside the nightmare fog gets a fog of its own
  d*=(1-P.armor);
  if(P.shield>0){const a=Math.min(P.shield,d);P.shield-=a;d-=a;}
  P.hp-=d;P.iframes=0.45;P.hurt=0.25;G.shake=Math.max(G.shake,6);
  if(d>0)floatText(P.x,P.y-45,'-'+Math.round(d),'#ff4d4d',true);
- if(P.hp<=0){P.hp=0;burst(P.x,P.y-20,40,'#ffffff',1.5);endRun(false);}
+ if(P.hp<=0){P.hp=0;burst(P.x,P.y-20,40,'#ffffff',1.5);
+  if(LOOK==='chess')shatter(P.x,P.y,15,'#f6f2e6','#2b2b2b');   // R63: pieces shatter, figures fall over
+  else G.corpses.push({player:true,fig:playerClass(),rank:P.form,x:P.x,y:P.y,s:15+P.form*0.7,flip:Math.cos(P.aim)<0,side:Math.cos(P.aim)<0?1:-1,t:0,dur:0.6});
+  endRun(false);}
+}
+// R63 chess theme: a piece breaks into spinning shards.
+function shatter(x,y,s,c1,c2){for(let k=0;k<16;k++)particle('shard',x+rand(-s*0.5,s*0.5),y-rand(0,s*2.2),k%3?c1:c2,{v:rand(60,220),vy:-rand(40,160),g:420,dur:rand(0.5,0.9),sz:rand(3,s*0.4+3)});}
+// R63 fantasy theme: the body tips over, then vanishes in a puff.
+const corpseAngle=c=>c.side*(Math.PI/2)*Math.min(1,(c.t/0.32)**1.6);
+function poof(x,y,s){for(let k=0;k<12;k++){const a=k/12*TAU;particle('poof',x+Math.cos(a)*s*0.6,y-s*0.5+Math.sin(a)*s*0.3,k%2?'#e8e8e8':'#b8b8b8',{a,v:rand(20,60),vy:-rand(10,40),dur:rand(0.45,0.7),sz:rand(s*0.35,s*0.6)+3});}}
+function stepCorpses(dt){
+ for(const c of G.corpses){c.t+=dt;if(c.t>=c.dur){c.done=true;poof(c.x+c.side*c.s*1.1,c.y,c.s*(c.boss?1.6:1));}}
+ G.corpses=G.corpses.filter(c=>!c.done);
 }
 function killEnemy(e){
  if(e.dead)return;
  e.dead=true;G.kills++;G.score+=e.score*G.floor;
  burst(e.x,e.y-e.s,e.boss?80:9,e.boss?'#e0b84f':'#2a2a33',e.boss?2.5:1);
+ if(!e.static&&(e.boss||dist2(e.x,e.y,P.x,P.y)<1100*1100)){   // R63 death animation (near the player only)
+  if(LOOK==='chess'){if(!e.boss)shatter(e.x,e.y,e.s,'#24242b','#a8a8b8');}
+  else if(G.corpses.length<140)G.corpses.push({fig:e.boss?BOSS_LOOK[e.type]:ENEMY_LOOK[e.type],x:e.x,y:e.y,s:e.s,flip:P.x<e.x,side:P.x<e.x?1:-1,boss:!!e.boss,t:0,dur:e.boss?0.9:0.45});}
+ if(e.boss){   // R63: bosses go out with a large burst
+  burst(e.x,e.y-e.s,110,'#ffd84a',3.2);burst(e.x,e.y-e.s,50,'#ffffff',2.4);
+  if(LOOK==='chess')shatter(e.x,e.y,e.s,'#ece6d6','#151515');
+  sparkle(e.x,e.y-e.s,40,'#ffd84a',3,e.s);debris(e.x,e.y,24,'#6a4a30',2);
+  addFx({kind:'ring',x:e.x,y:e.y,r0:30,r:380,color:'#ffffff',w:26,dur:0.7});addFx({kind:'ring',x:e.x,y:e.y,r0:20,r:540,color:'#ffd84a',w:16,dur:0.9});
+  addFx({kind:'spokes',x:e.x,y:e.y,r:460,n:28,color:'#ffd84a',dur:0.6});G.screenFlash={c:'#fff4d0',t:0,dur:0.5};}
  if(e.invBoom){const b=e.invBoom;e.invBoom=0;inversionBoom(e.x,e.y,b);}
  if(e.boss){onBossDown(e);return;}
  if(G.phase==='cleared')return;
@@ -766,6 +1031,7 @@ function castSpell(i){
  fireSpell(d,s.lvl);
 }
 /* ---------- R51-R54 Grandmaster rituals ---------- */
+function fogRetaliate(src){}   // filled in with Fog of the Nightmare (R72)
 const spellCol=d=>d.col||EL_COL[d.el];
 // Outgoing enemy damage. Enemies weakened by Game of Despair (R52) deal 35% less.
 const edmg=e=>e.dmg*(e.despairT>0?0.65:1);
@@ -933,7 +1199,8 @@ function moveToward(e,dx,dy,d,sp,dt,sign){
  sign=sign||1;e.x+=dx/d*sp*dt*sign;e.y+=dy/d*sp*dt*sign;
  if(e.stuckT>0){e.stuckT-=dt;e.x+=-dy/d*e.side*sp*0.9*dt;e.y+=dx/d*e.side*sp*0.9*dt;}
 }
-function shootE(x,y,a,speed,dmg,r,color){speed*=diff().proj;G.eproj.push({x,y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,r,dmg,life:4,color});}
+let curShooter=null;   // the enemy whose AI is running, so shots and telegraphs know their source (R72)
+function shootE(x,y,a,speed,dmg,r,color){speed*=diff().proj;G.eproj.push({x,y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,r,dmg,life:4,color,src:curShooter});}
 function fan(x,y,a,n,spread,speed,dmg,color){for(let i=0;i<n;i++)shootE(x,y,a+(n>1?(i/(n-1)-0.5)*spread:0),speed,dmg,7,color);}
 const AI={
  pawn(e,dt,dx,dy,d,sp){moveToward(e,dx,dy,d,sp,dt);},
@@ -983,9 +1250,11 @@ function updateEnemy(e,dt){
  e.flash-=dt;e.txtCd-=dt;e.slowT-=dt;e.buffT-=dt;e.cd-=dt;e.cd2-=dt;e.weakT-=dt;if(e.despairT>0)e.despairT-=dt;if(e.frozenT>0)e.frozenT-=dt;
  if(e.dots.length)tickDots(e,dt);
  if(e.dead)return;
- if(e.static){e.kx=e.ky=0;const dx=P.x-e.x,dy=P.y-e.y;if(e.stunT>0)e.stunT-=dt;else AI[e.type](e,dt,dx,dy,Math.hypot(dx,dy)||1,0);return;}
+ curShooter=e;
+ if(e.static){e.kx=e.ky=0;const dx=P.x-e.x,dy=P.y-e.y;if(e.stunT>0)e.stunT-=dt;else AI[e.type](e,dt,dx,dy,Math.hypot(dx,dy)||1,0);curShooter=null;return;}
  e.x+=e.kx*dt;e.y+=e.ky*dt;const dec=Math.max(0,1-8*dt);e.kx*=dec;e.ky*=dec;
- if(e.boss)bossUpdate(e,dt);
+ if(e.sleepT>0){e.sleepT-=dt;}   // R71: asleep (damage does not wake it)
+ else if(e.boss)bossUpdate(e,dt);
  else if(e.charmT>0)charmUpdate(e,dt);
  else if(e.stunT>0){e.stunT-=dt;}
  else{
@@ -995,7 +1264,8 @@ function updateEnemy(e,dt){
  }
  if(!e.boss&&e.z<8){e.bumped=collideStructures(e);if(e.bumped&&e.stuckT<=0)e.stuckT=0.6;}
  e.x=clamp(e.x,e.r,WORLD-e.r);e.y=clamp(e.y,e.r,WORLD-e.r);
- if(e.z<8&&!(e.charmT>0)){const rr=e.r+P.r;if(dist2(e.x,e.y,P.x,P.y)<rr*rr)damagePlayer(edmg(e)*(e.dashing?1.5:1));}
+ curShooter=null;
+ if(e.z<8&&!(e.charmT>0)&&!(e.sleepT>0)){const rr=e.r+P.r;if(dist2(e.x,e.y,P.x,P.y)<rr*rr)damagePlayer(edmg(e)*(e.dashing?1.5:1),e);}
 }
 function separate(){
  const cell=48,grid=new Map();
@@ -1009,17 +1279,17 @@ function separate(){
 }
 
 /* ================= BOSSES ================= */
-function hzCircle(x,y,r,delay,dmg){G.hazards.push({k:'c',x,y,r,delay,t:0,dmg});}
-function hzLine(ax,ay,a,len,w,delay,dmg){G.hazards.push({k:'l',ax,ay,bx:ax+Math.cos(a)*len,by:ay+Math.sin(a)*len,w,delay,t:0,dmg});}
+function hzCircle(x,y,r,delay,dmg){G.hazards.push({k:'c',x,y,r,delay,t:0,dmg,src:curShooter});}
+function hzLine(ax,ay,a,len,w,delay,dmg){G.hazards.push({k:'l',ax,ay,bx:ax+Math.cos(a)*len,by:ay+Math.sin(a)*len,w,delay,t:0,dmg,src:curShooter});}
 function ringShot(b,n,speed,off){for(let k=0;k<n;k++)shootE(b.x,b.y,(off||0)+k/n*TAU,speed,edmg(b)*0.6,10,'#e0b84f');}
 function beamStar(b,off,n,dmg){for(let k=0;k<n;k++)hzLine(b.x,b.y,off+k*TAU/n,1500,70,1.1,dmg);}
 function spawnBoss(){
  const B=BOSSES[G.floor-1],a=rand(0,TAU),hp=B.hp*(1+0.02*(P.level-1))*diff().hp;
  const x=clamp(P.x+Math.cos(a)*650,120,WORLD-120),y=clamp(P.y+Math.sin(a)*650,120,WORLD-120);
- const b={boss:true,type:B.type,name:B.name,x,y,r:B.r,s:B.s,hp,maxHp:hp,dmg:B.dmg*diff().dmg,speed:B.speed,dots:[],weakT:0,kx:0,ky:0,slowT:0,stunT:0,buffT:0,stuckT:0,flash:0,txtCd:0,
+ const b={boss:true,type:B.type,name:bossName(B),x,y,r:B.r,s:B.s,hp,maxHp:hp,dmg:B.dmg*diff().dmg,speed:B.speed,dots:[],weakT:0,kx:0,ky:0,slowT:0,stunT:0,buffT:0,stuckT:0,flash:0,txtCd:0,
   st:'walk',t:0,cd:0,cd2:0,z:0,phase:0,side:1,dead:false,atkT:2.5,busy:0,enraged:false,score:0,xp:0,gold:0};
  G.enemies.push(b);G.boss=b;G.phase='boss';
- banner('The '+B.name+' approaches!','Defeat it to clear Floor '+G.floor);G.shake=12;
+ banner('The '+b.name+' approaches!','Defeat it to clear Floor '+G.floor);G.shake=12;
  addFx({kind:'ring',x,y,r0:20,r:200,color:'#e0b84f',w:10,dur:0.8});
 }
 function startLeap(b){
@@ -1051,7 +1321,8 @@ function bossAttack(b,a){
 function bossUpdate(b,dt){
  const dx=P.x-b.x,dy=P.y-b.y,d=Math.hypot(dx,dy)||1;
  if(!b.enraged&&b.hp<b.maxHp*0.5){b.enraged=true;banner(b.name+' is enraged!','Its attacks quicken');}
- b.atkT-=dt*(b.enraged?1.45:1);
+ const slow=b.slowT>0?0.55:1;   // bosses can't sleep; Sweet Slumber slows them instead (R71)
+ b.atkT-=dt*(b.enraged?1.45:1)*slow;
  if(b.leap){const L=b.leap;L.t+=dt;const p=Math.min(1,L.t/L.dur);b.x=L.fx+(L.tx-L.fx)*p;b.y=L.fy+(L.ty-L.fy)*p;b.z=Math.sin(Math.PI*p)*140;
   if(p>=1){b.z=0;b.leap=null;G.shake=Math.max(G.shake,12);addFx({kind:'ring',x:b.x,y:b.y,r0:20,r:b.r+120,color:'#ffffff',w:8,dur:0.4});burst(b.x,b.y,20,'#a08060',2);
    if(b.leapsLeft>0){b.leapsLeft--;startLeap(b);}}
@@ -1063,19 +1334,19 @@ function bossUpdate(b,dt){
   while(S.acc>=0.09){S.acc-=0.09;S.a+=0.32;for(let k=0;k<S.arms;k++)shootE(b.x,b.y,S.a+k*TAU/S.arms,240,edmg(b)*0.55,9,'#d24bff');}
   if(S.t<=0)b.spiral=null;return;}
  if(b.busy>0){b.busy-=dt;return;}
- const sp=b.speed*(b.enraged?1.2:1);if(d>b.r+P.r){b.x+=dx/d*sp*dt;b.y+=dy/d*sp*dt;}
+ const sp=b.speed*(b.enraged?1.2:1)*slow;if(d>b.r+P.r){b.x+=dx/d*sp*dt;b.y+=dy/d*sp*dt;}
  if(b.atkT<=0){b.atkT=rand(2.0,3.0);bossAttack(b,pick(BOSS_ATTACKS[b.type]));}
 }
 function onBossDown(b){
- G.score+=2500*G.floor;P.gold+=60*G.floor;G.boss=null;G.phase='cleared';G.clearT=3.5;G.cartT=CART_DELAY;G.cart=null;G.shake=20;
+ G.score+=2500*G.floor;P.gold+=60*G.floor;G.boss=null;G.phase='cleared';G.clearT=3.5;G.cartT=CART_DELAY;G.cart=null;G.shake=26;
  for(const e of G.enemies)if(!e.dead){e.dead=true;burst(e.x,e.y-e.s,6,'#2a2a33');}
  G.eproj=[];G.hazards=[];G.timers=[];
  for(const p of G.pickups){if(p.k==='xp')gainXp(p.v);else P.gold+=p.v;}G.pickups=[];
  gainXp(15*G.floor);
  addFx({kind:'flash',x:b.x,y:b.y,r:400,color:'#ffffff',dur:0.6});
- if(G.floor>=6){banner('CHECKMATE!','The Checkered King has fallen. You rule the board.');}
+ if(G.floor>=6){banner(L('VICTORY!','CHECKMATE!'),L('The Tyrant King has fallen. The realm is free.','The Checkered King has fallen. You rule the board.'));}
  else{P.form=G.floor;FORM_BONUS[P.form].fn();P.maxHp+=20;P.hp=Math.min(P.maxHp,P.hp+P.maxHp*0.5);
-  banner('Promotion! You are now a '+FORM_NAMES[P.form],FORM_BONUS[P.form].txt);
+  banner(L('Rank up! You are now a ','Promotion! You are now a ')+rankName(),FORM_BONUS[P.form].txt);
   addFx({kind:'ring',x:P.x,y:P.y,r0:10,r:180,color:'#ffffff',w:10,dur:0.8});burst(P.x,P.y-20,40,'#f4ecd8',2);}
 }
 
@@ -1084,8 +1355,8 @@ function startFloor(){
  G.floorTime=0;G.phase='wave';G.dur=60+15*G.floor;G.spawnAcc=0;G.packT=rand(12,16);
  G.enemies=[];G.pproj=[];G.eproj=[];G.hazards=[];G.pstrikes=[];G.zones=[];G.beams=[];G.orbs=[];G.pickups=[];G.timers=[];G.casts=[];G.cart=null;G.rituals=[];
  // every floor is a new board (R19): new layout and colour theme, player back in the centre
- G.theme=themeFor(G.floor);G.structs=genMap(G.floor);P.x=WORLD/2;P.y=WORLD/2;P.rush=null;P.dashT=0;P.windup=0;
- banner('Floor '+G.floor+': '+G.theme.name,G.theme.sub+' · Survive until the '+BOSSES[G.floor-1].name+' arrives');
+ G.theme=themeFor(G.floor);G.structs=genMap(G.floor);G.decor=genDecor(G.floor,G.structs);G.corpses=[];P.x=WORLD/2;P.y=WORLD/2;P.rush=null;P.dashT=0;P.windup=0;
+ banner('Floor '+G.floor+': '+G.theme.name,G.theme.sub+' · Survive until the '+bossName(BOSSES[G.floor-1])+' arrives');
  if(G.theme.hostile)placeHostiles(G.theme);
  // initial wave pours in from the board's edges
  for(let i=0;i<10+G.floor*4;i++){const p=spawnPos();if(p)spawnEnemy(rollEnemyType(),p.x,p.y);}
@@ -1131,12 +1402,12 @@ function update(dt){
  G.pproj=G.pproj.filter(p=>!p.dead);
  // enemy projectiles, with glowing trails (R18)
  for(const p of G.eproj){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;const rr=p.r+P.r*0.7;
-  if(dist2(p.x,p.y,P.x,P.y)<rr*rr){damagePlayer(p.dmg);p.life=0;sparkle(p.x,p.y-14,6,p.color,0.8);}
+  if(dist2(p.x,p.y,P.x,P.y)<rr*rr){damagePlayer(p.dmg,p.src);p.life=0;sparkle(p.x,p.y-14,6,p.color,0.8);}
   if(Math.random()<0.6&&onScreen(p.x,p.y,80))particle(Math.random()<0.5?'ember':'spark',p.x+rand(-3,3),p.y-14+rand(-3,3),p.color,{v:rand(5,30),dur:rand(0.25,0.4),sz:rand(2,4)});}
  G.eproj=G.eproj.filter(p=>p.life>0&&p.x>-50&&p.y>-50&&p.x<WORLD+50&&p.y<WORLD+50);
  // boss telegraphs: they land with a burst of sparks and debris (R18)
  for(const h of G.hazards){h.t+=dt;if(h.t>=h.delay){h.done=true;
-  if(h.dmg>0){const hit=h.k==='c'?dist2(P.x,P.y,h.x,h.y)<(h.r+P.r*0.5)**2:segDist2(P.x,P.y,h.ax,h.ay,h.bx,h.by)<(h.w/2+P.r*0.5)**2;if(hit)damagePlayer(h.dmg);
+  if(h.dmg>0){const hit=h.k==='c'?dist2(P.x,P.y,h.x,h.y)<(h.r+P.r*0.5)**2:segDist2(P.x,P.y,h.ax,h.ay,h.bx,h.by)<(h.w/2+P.r*0.5)**2;if(hit)damagePlayer(h.dmg,h.src);
    if(h.k==='c'){addFx({kind:'flash',x:h.x,y:h.y,r:h.r,color:'#ff5a3c',dur:0.3});addFx({kind:'ring',x:h.x,y:h.y,r0:h.r*0.3,r:h.r*1.05,color:'#ffd0a0',w:5,dur:0.35});
     sparkle(h.x,h.y,Math.round(10+h.r/12),'#ffb070',1+h.r/150,h.r*0.6);debris(h.x,h.y,Math.round(6+h.r/40),'#7a4a2a',1+h.r/200);sparkRing(h.x,h.y,h.r,10,'#ff5a3c');
     if(h.r>150)G.shake=Math.max(G.shake,7);}
@@ -1173,12 +1444,12 @@ function update(dt){
  // pickups
  for(const p of G.pickups){const q=dist2(p.x,p.y,P.x,P.y);
   if(q<P.magnet*P.magnet||p.pull){p.pull=true;const d=Math.sqrt(q)||1;p.x+=(P.x-p.x)/d*600*dt;p.y+=(P.y-p.y)/d*600*dt;}
-  if(q<(P.r+10)**2){p.done=true;if(p.k==='xp')gainXp(p.v);else{P.gold+=p.v;floatText(P.x,P.y-40,'+'+p.v+' ◆','#f4ecd8');}}}
+  if(q<(P.r+10)**2){p.done=true;if(p.k==='xp')gainXp(p.v);else{P.gold+=p.v;floatText(P.x,P.y-40,'+'+p.v+L(' gold',' ◆'),L('#ffd84a','#f4ecd8'));}}}
  if(G.pickups.length>450){for(const p of G.pickups.splice(0,G.pickups.length-450)){if(p.k==='xp')gainXp(p.v);else P.gold+=p.v;}}
  G.pickups=G.pickups.filter(p=>!p.done);
  // visuals
  for(const f of G.fx)f.t+=dt;G.fx=G.fx.filter(f=>f.t<f.dur);
- stepParticles(dt);
+ stepParticles(dt);stepCorpses(dt);
  for(const t of G.texts)t.t+=dt;G.texts=G.texts.filter(t=>t.t<0.8);
  if(G.banner){G.banner.t+=dt;if(G.banner.t>3.2)G.banner=null;}
  G.shake*=Math.max(0,1-6*dt);
@@ -1244,7 +1515,7 @@ function showLogbook(){
  for(let t=1;t<=6;t++){
   h+='<h2 style="color:'+TIER_COL[t]+'">'+TIER_NAME[t].toUpperCase()+'</h2><div class="loggrid">';
   for(const s of ALL_SPELLS.filter(s=>s.tier===t)){
-   if(log.has(s.id))h+='<div class="logent t'+t+'"><span class="badge" style="background:'+(EL_COL[s.el]||'#ccc')+'">'+s.el+'</span><h3>'+esc(s.name)+'</h3><p>'+esc(s.desc)+'</p>'+
+   if(log.has(s.id))h+='<div class="logent t'+t+'"><span class="sico">'+iconSVG(spellIcon(s),24,spellCol(s))+'</span><span class="badge" style="background:'+(EL_COL[s.el]||'#ccc')+'">'+s.el+'</span><h3>'+esc(s.name)+'</h3><p>'+esc(s.desc)+'</p>'+
     '<p class="meta">Cooldown '+s.cd+'s'+(s.dmg?' · Power '+s.dmg:'')+(s.windup?' · Wind-up '+s.windup+'s':'')+'</p></div>';
    else h+='<div class="logent locked t'+t+'"><span class="lock">?</span><h3>???</h3><p>'+TIER_NAME[t]+' · not yet discovered</p></div>';
   }
@@ -1259,14 +1530,34 @@ const CROWN_RANK={easy:1,normal:2,hard:3},CROWN_PX={easy:16,normal:24,hard:34},C
 function loadCrowns(){try{return JSON.parse(localStorage.getItem('slaughtermate_crowns')||'{}');}catch(e){return {};}}
 function awardCrown(w,d){const c=loadCrowns();if(!c[w]||CROWN_RANK[d]>CROWN_RANK[c[w]]){c[w]=d;try{localStorage.setItem('slaughtermate_crowns',JSON.stringify(c));}catch(e){}return true;}return false;}
 function crownHTML(w){const d=loadCrowns()[w];if(!d)return '';
- return '<span class="crown" title="Cleared on '+DIFFICULTY[d].name+'" style="font-size:'+CROWN_PX[d]+'px;color:'+CROWN_COL[d]+'">♔</span>';}
+ return '<span class="crown" title="Cleared on '+DIFFICULTY[d].name+'" style="font-size:'+CROWN_PX[d]+'px;color:'+CROWN_COL[d]+'">'+L(iconSVG('grandmaster',CROWN_PX[d],CROWN_COL[d]),'♔')+'</span>';}
+/* ---------- R55/R60/R62 theme switch ---------- */
+const WIN_MARK=()=>L(' ⚜',' ♔');
+function applyLook(){
+ document.body.classList.toggle('chess',LOOK==='chess');
+ document.title=L('Magic Rush','Slaughtermate');
+ $('gameTitle').textContent=L('⚔ MAGIC RUSH ✦','♟ SLAUGHTERMATE ♚');
+ $('gameSub').textContent=L("A fantasy hack'n'slash. Rise from Squire, Novice or Scout to legend.","A chess hack'n'slash. Rise from Pawn to King: ♙ → ♘ → ♗ → ♖ → ♕ → ♔");
+ $('hallTitle').textContent=L('HALL OF HEROES','HALL OF KINGS');
+ $('menuKeys').textContent='WASD move · Space dash · Left click attack · Hold left click to charge, release to unleash · 1–5 cast spells · Esc pause';
+ $('menuHint').textContent=L('Survive each floor, slay its boss, rise in rank, visit the merchants, repeat. Defeat the Tyrant King on Floor 6 to win.',
+  'Survive each floor, slay the giant checkered boss, get promoted, shop, repeat. Beat the King on Floor 6 to win.');
+ $('pauseSub').textContent=L('Catch your breath, adventurer.','The board waits for your move.');
+ $('quitBtn').textContent=L('Retreat (end run)','Resign (end run)');
+ $('lookBtn').textContent=L('♟ Switch to the chess theme','✦ Switch to the fantasy theme');
+}
+function setLook(l){
+ LOOK=l==='chess'?'chess':'fantasy';
+ try{localStorage.setItem('slaughtermate_look',LOOK);}catch(e){}
+ applyLook();if(G.state==='menu')showMenu();
+}
 function showMenu(){
- hideAll();G=makeState();P=makePlayer('sword');G.state='menu';
+ hideAll();applyLook();G=makeState();P=makePlayer('sword');G.state='menu';
  const sc=loadScores();
- $('bestFloor').textContent=sc.length?Math.max(...sc.map(s=>s.floor))+(sc.some(s=>s.won)?' ♔':''):'–';
+ $('bestFloor').textContent=sc.length?Math.max(...sc.map(s=>s.floor))+(sc.some(s=>s.won)?WIN_MARK():''):'–';
  $('bestScore').textContent=sc.length?Math.max(...sc.map(s=>s.score)).toLocaleString():'–';
- $('scores').innerHTML=sc.length?sc.map((s,i)=>`<tr><td>${i+1}</td><td>${esc(s.name)}${s.won?' ♔':''}</td><td>${s.floor}</td><td>${s.score.toLocaleString()}</td><td>${esc(s.weapon)}</td><td>${esc(s.difficulty||'Normal')}</td></tr>`).join('')
-  :'<tr><td colspan="6" style="text-align:center;opacity:.7">No games played yet. Be the first king.</td></tr>';
+ $('scores').innerHTML=sc.length?sc.map((s,i)=>`<tr><td>${i+1}</td><td>${esc(s.name)}${s.won?WIN_MARK():''}</td><td>${s.floor}</td><td>${s.score.toLocaleString()}</td><td>${esc(s.weapon)}</td><td>${esc(s.difficulty||'Normal')}</td></tr>`).join('')
+  :'<tr><td colspan="6" style="text-align:center;opacity:.7">'+L('No legends yet. Be the first hero.','No games played yet. Be the first king.')+'</td></tr>';
  const db=$('difficulty');db.innerHTML='';
  for(const k in DIFFICULTY){const d=document.createElement('div');d.className='card stat'+(k===selDifficulty?' sel':'');
   d.innerHTML=`<h3>${DIFFICULTY[k].name}</h3><p>${DIFF_DESC[k]}</p>`;d.onclick=()=>{selDifficulty=k;showMenu();};db.appendChild(d);}
@@ -1278,6 +1569,7 @@ function showMenu(){
 }
 $('startBtn').onclick=()=>newRun(selWeapon,selDifficulty);
 $('logBtn').onclick=()=>showLogbook();
+$('lookBtn').onclick=()=>setLook(LOOK==='chess'?'fantasy':'chess');
 function setPaused(on){if(on){G.state='paused';mouse.down=false;$('pause').classList.remove('hidden');}else{G.state='play';$('pause').classList.add('hidden');}}
 $('resumeBtn').onclick=()=>setPaused(false);
 $('quitBtn').onclick=()=>{$('pause').classList.add('hidden');G.state='play';endRun(false);};
@@ -1285,7 +1577,7 @@ function resume(){G.state='play';mouse.down=false;P.holdT=0;}
 function spellCardHTML(id,extra){
  const s=SPELL_BY_ID[id],own=P.spells.find(x=>x&&x.id===id);
  return `<span class="badge" style="background:${TIER_COL[s.tier]}">${TIER_NAME[s.tier]}</span> ${s.tier===6?'':`<span class="badge" style="background:${spellCol(s)}">${s.el}</span>`}
-  <h3>${s.name}${own?' <small>(Lv '+own.lvl+' → '+(own.lvl+1)+')</small>':''}</h3><p>${s.desc}</p><p style="opacity:.7">Cooldown ${s.cd}s${s.dmg?' · Power '+s.dmg:''}${s.windup?' · Wind-up '+s.windup+'s':''}</p>${extra||''}`;
+  <span class="sico">${iconSVG(spellIcon(s),26,spellCol(s))}</span><h3>${s.name}${own?' <small>(Lv '+own.lvl+' → '+(own.lvl+1)+')</small>':''}</h3><p>${s.desc}</p><p style="opacity:.7">Cooldown ${s.cd}s${s.dmg?' · Power '+s.dmg:''}${s.windup?' · Wind-up '+s.windup+'s':''}</p>${extra||''}`;
 }
 function openLevelUp(){
  G.state='levelup';mouse.down=false;
@@ -1335,6 +1627,7 @@ function closeShop(){$('shop').classList.add('hidden');$('replace').classList.ad
 // Inline shard icon for the HTML panels (R48).
 const SHARD_SVG='<svg class="shard" viewBox="0 0 12 16" aria-hidden="true"><polygon points="6,0 11,5 9,14 3,16 1,7" fill="#f4ecd8" stroke="#1b1209"/><polygon points="6,0 9,14 3,16" fill="#b9ad94"/></svg>';
 const frags=n=>SHARD_SVG+' '+n+' fragments';
+const money=n=>L(GOLD_SVG+' '+n+' gold',frags(n));   // R64 gold bars (fantasy) / R48 fragments (chess)
 
 function openShop(){
  G.state='shop';mouse.down=false;
@@ -1347,29 +1640,29 @@ function openShop(){
 function rollShopSpells(){const ex=new Set();G.shop.spells=[];for(let i=0;i<4;i++){const id=drawSpell(rollTier(1),ex);if(id){ex.add(id);G.shop.spells.push(id);}}G.shop.sold={};}
 function renderShop(){
  const S=G.shop,el=$('shop'),f=G.floor,statPrice=70+25*f,potPrice=25+10*f;
- el.innerHTML=`<div class="panel"><h1 style="font-size:34px">THE ROYAL BAZAAR</h1>
-  <p class="sub">The merchant pawns greet you · Floor ${f} cleared · You are a <b>${FORM_NAMES[P.form]}</b> · <b class="frag">${frags(P.gold)}</b> · HP ${Math.ceil(P.hp)}/${P.maxHp}</p>
+ el.innerHTML=`<div class="panel"><h1 style="font-size:34px">${L('THE TRAVELLING MERCHANTS','THE ROYAL BAZAAR')}</h1>
+  <p class="sub">${L('The merchants greet you','The merchant pawns greet you')} · Floor ${f} cleared · You are a <b>${rankName()}</b> · <b class="frag">${money(P.gold)}</b> · HP ${Math.ceil(P.hp)}/${P.maxHp}</p>
   <h2>SPELL SCROLLS</h2><div class="cards3 four" id="shSpells"></div>
   ${S.gm?'<h2 style="color:#ff4fd8">GRANDMASTER RELIC</h2><div class="cards3" id="shGm"></div>':''}
   <h2>RELICS & POTIONS</h2><div class="cards3 four" id="shItems"></div>
   <h2>YOUR SPELLS</h2><div class="row">${P.spells.map((s,i)=>`<span class="eq">${i+1}: ${s?SPELL_BY_ID[s.id].name+' Lv'+s.lvl:'— empty —'}</span>`).join('')}</div>
-  <div class="row"><button class="btn small" id="shRe">Reroll scrolls (${frags(S.reroll)})</button></div>
+  <div class="row"><button class="btn small" id="shRe">Reroll scrolls (${money(S.reroll)})</button></div>
   <button class="btn" id="shGo">ADVANCE TO FLOOR ${f+1}: ${themeFor(f+1).name.toUpperCase()} ▶</button><p class="sub">Esc also closes the cart and advances</p></div>`;
  const sb=$('shSpells');
  S.spells.forEach((id,i)=>{const s=SPELL_BY_ID[id],price=SPELL_PRICE[s.tier],sold=S.sold[i],d=document.createElement('div');
   d.className='card t'+s.tier+(sold||P.gold<price?' dis':'');
-  d.innerHTML=spellCardHTML(id,`<p class="price">${sold?'SOLD':frags(price)}</p>`);
+  d.innerHTML=spellCardHTML(id,`<p class="price">${sold?'SOLD':money(price)}</p>`);
   d.onclick=()=>{if(sold||P.gold<price)return;P.gold-=price;S.sold[i]=true;equipSpell(id,()=>{G.state='shop';renderShop();});};
   sb.appendChild(d);});
  if(S.gm){const sold=S.sold.gm,d=document.createElement('div');d.className='card t6'+(sold||P.gold<GM_PRICE?' dis':'');
-  d.innerHTML=spellCardHTML(S.gm,`<p class="price">${sold?'SOLD':frags(GM_PRICE)}</p>`);
+  d.innerHTML=spellCardHTML(S.gm,`<p class="price">${sold?'SOLD':money(GM_PRICE)}</p>`);
   d.onclick=()=>{if(S.sold.gm||P.gold<GM_PRICE)return;P.gold-=GM_PRICE;S.sold.gm=true;equipSpell(S.gm,()=>{G.state='shop';renderShop();});};$('shGm').appendChild(d);}
  const ib=$('shItems');
  const pot=document.createElement('div');pot.className='card stat'+(S.potion||P.gold<potPrice||P.hp>=P.maxHp?' dis':'');
- pot.innerHTML=`<span class="badge" style="background:#e88">Potion</span><span class="ico">⚗</span><h3>Royal Elixir</h3><p>Fully restore your HP.</p><p class="price">${S.potion?'SOLD':frags(potPrice)}</p>`;
+ pot.innerHTML=`<span class="badge" style="background:#e88">Potion</span><span class="ico">⚗</span><h3>Royal Elixir</h3><p>Fully restore your HP.</p><p class="price">${S.potion?'SOLD':money(potPrice)}</p>`;
  pot.onclick=()=>{if(S.potion||P.gold<potPrice||P.hp>=P.maxHp)return;P.gold-=potPrice;P.hp=P.maxHp;S.potion=true;renderShop();};ib.appendChild(pot);
  S.stats.forEach((u,i)=>{const sold=S.sold['u'+i],d=document.createElement('div');d.className='card stat'+(sold||P.gold<statPrice?' dis':'');
-  d.innerHTML=`<span class="badge" style="background:#c9a56a">Relic</span><span class="ico">${u.ico}</span><h3>${u.name}</h3><p>${u.desc}</p><p class="price">${sold?'SOLD':frags(statPrice)}</p>`;
+  d.innerHTML=`<span class="badge" style="background:#c9a56a">Relic</span><span class="ico">${u.ico}</span><h3>${u.name}</h3><p>${u.desc}</p><p class="price">${sold?'SOLD':money(statPrice)}</p>`;
   d.onclick=()=>{if(sold||P.gold<statPrice)return;P.gold-=statPrice;S.sold['u'+i]=true;u.apply();renderShop();};ib.appendChild(d);});
  $('shRe').onclick=()=>{if(P.gold<S.reroll)return;P.gold-=S.reroll;S.reroll+=15;const keep={};for(const k in S.sold)if(k[0]==='u'||k==='gm')keep[k]=true;rollShopSpells();Object.assign(S.sold,keep);renderShop();};
  $('shGo').onclick=closeShop;
@@ -1386,13 +1679,13 @@ function endRun(won){
  const m=Math.floor(G.runTime/60),s=Math.floor(G.runTime%60);
  const el=$('end');
  el.innerHTML=`<div class="panel" style="max-width:640px;text-align:center">
-  <h1 style="font-size:42px">${won?'CHECKMATE! ♔':'CHECKMATED ♚'}</h1>
-  <p class="sub">${won?'You rose from a lowly pawn to rule the entire board.':'Your '+FORM_NAMES[P.form]+' was taken on Floor '+G.floor+'.'}</p>
-  <div class="stats"><div>Score<b>${final.toLocaleString()}</b></div><div>Floor<b>${G.floor}${won?' ♔':''}</b></div><div>Kills<b>${G.kills}</b></div>
+  <h1 style="font-size:42px">${won?L('VICTORY! ⚜','CHECKMATE! ♔'):L('DEFEATED','CHECKMATED ♚')}</h1>
+  <p class="sub">${won?L('The Tyrant King has fallen and the realm is free. Your legend will be sung for ages.','You rose from a lowly pawn to rule the entire board.'):L('Your '+rankName()+' fell on Floor '+G.floor+'.','Your '+FORM_NAMES[P.form]+' was taken on Floor '+G.floor+'.')}</p>
+  <div class="stats"><div>Score<b>${final.toLocaleString()}</b></div><div>Floor<b>${G.floor}${won?WIN_MARK():''}</b></div><div>Kills<b>${G.kills}</b></div>
   <div>Level<b>${P.level}</b></div><div>Weapon<b>${WEAPONS[G.weapon].name}</b></div><div>Time<b>${m}:${String(s).padStart(2,'0')}</b></div></div>
   <p class="sub">Difficulty: ${diff().name} (score ×${diff().score})</p>
-  ${crowned?`<p class="sub" style="color:${CROWN_COL[G.difficulty]}">♔ New crown for the ${WEAPONS[G.weapon].name} (${diff().name})!</p>`:''}
-  <p>Name for the Hall of Kings: <input id="nameIn" maxlength="14" value="${esc(getName())}"></p>
+  ${crowned?`<p class="sub" style="color:${CROWN_COL[G.difficulty]}">${L(iconSVG('grandmaster',18,CROWN_COL[G.difficulty]),'♔')} New crown for the ${WEAPONS[G.weapon].name} (${diff().name})!</p>`:''}
+  <p>Name for the ${L('Hall of Heroes','Hall of Kings')}: <input id="nameIn" maxlength="14" value="${esc(getName())}"></p>
   <button class="btn" id="saveBtn">SAVE & RETURN</button></div>`;
  $('saveBtn').onclick=()=>{
   const name=($('nameIn').value||'Player').trim().slice(0,14)||'Player';
@@ -1410,10 +1703,70 @@ function panel(x,y,w,h){ctx.fillStyle='rgba(38,24,14,.86)';ctx.strokeStyle='#e0b
 function bar(x,y,w,h,frac,col,bg){ctx.fillStyle=bg||'#2a1a10';ctx.fillRect(x,y,w,h);ctx.fillStyle=col;ctx.fillRect(x,y,w*clamp(frac,0,1),h);ctx.strokeStyle='#000';ctx.lineWidth=1;ctx.strokeRect(x+.5,y+.5,w-1,h-1);}
 const onScreen=(x,y,m)=>x>cam.x-m&&x<cam.x+VW+m&&y>cam.y-m&&y<cam.y+VH+m;
 
+// R59: fantasy grounds. No board squares: a base colour with patches, planks, flagstones, pools or carpet.
+function drawFantasyGround(th,x0,y0,x1,y1,T){
+ ctx.fillStyle=th.tileA;ctx.fillRect(x0*T,y0*T,(x1-x0)*T,(y1-y0)*T);
+ const st=th.ground;
+ for(let i=x0;i<x1;i++)for(let j=y0;j<y1;j++){const h=hsh(i*131+j*17),h2=hsh(i*7+j*311),bx=i*T,by=j*T;
+  if(st==='grass'){ctx.fillStyle=th.tileB;if(h<0.35){ctx.beginPath();ctx.ellipse(bx+h2*T,by+h*T*2,26+h*40,14+h2*20,h*3,0,TAU);ctx.fill();}
+   ctx.beginPath();for(let k=0;k<3;k++){const gx=bx+hsh(i+k*9+j*3)*T,gy=by+hsh(j+k*5+i*7)*T;ctx.moveTo(gx-4,gy);ctx.lineTo(gx-2,gy-9);ctx.lineTo(gx,gy);ctx.lineTo(gx+2,gy-8);ctx.lineTo(gx+4,gy);}ctx.fill();}
+  else if(st==='library'){ctx.fillStyle=th.tileB;ctx.fillRect(bx,by+T-4,T,4);if((i+j*3)%5===0)ctx.fillRect(bx+T-4,by,4,T-4);
+   if(h<0.12){ctx.fillStyle='rgba(255,230,140,.25)';ctx.beginPath();ctx.arc(bx+T/2,by+T/2,20,0,TAU);ctx.fill();}}
+  else if(st==='stone'){ctx.fillStyle=th.tileB;const w=T*(0.42+h*0.1);ctx.fillRect(bx+4,by+4,w-6,T*0.45-6);ctx.fillRect(bx+w+2,by+T*0.5,T-w-6,T*0.46);
+   if(h2<0.25){ctx.strokeStyle='#4e4e50';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(bx+h*T,by+10);ctx.lineTo(bx+h*T+12,by+40);ctx.lineTo(bx+h*T+4,by+70);ctx.stroke();}}
+  else if(st==='swamp'){ctx.fillStyle=th.tileB;if(h<0.45){ctx.beginPath();ctx.ellipse(bx+h2*T,by+h*T*2,30+h*50,16+h2*24,h2*2,0,TAU);ctx.fill();
+    ctx.strokeStyle='rgba(155,224,74,.25)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(bx+h2*T,by+h*T*2,6+((G.time*8+h*40)%14),0,TAU);ctx.stroke();}}
+  else{ctx.fillStyle=th.tileB;ctx.fillRect(bx+2,by+2,T/2-4,T/2-4);ctx.fillRect(bx+T/2+2,by+T/2+2,T/2-4,T/2-4);}   // castle: dark flagstones
+ }
+ if(st==='castle'){const CELL=WORLD/8;   // red carpets with gold edges run down every hall
+  for(let k=0;k<8;k++){const c=k*CELL+CELL/2;ctx.fillStyle=th.carpet;ctx.fillRect(c-36,y0*T,72,(y1-y0)*T);ctx.fillRect(x0*T,c-36,(x1-x0)*T,72);
+   ctx.fillStyle=th.gold;ctx.fillRect(c-36,y0*T,4,(y1-y0)*T);ctx.fillRect(c+32,y0*T,4,(y1-y0)*T);ctx.fillRect(x0*T,c-36,(x1-x0)*T,4);ctx.fillRect(x0*T,c+32,(x1-x0)*T,4);}}
+}
+function drawDecor(){
+ const th=G.theme,t=G.time;
+ for(const d of G.decor){if(d.x<cam.x-80||d.x>cam.x+VW+80||d.y<cam.y-40||d.y>cam.y+VH+140)continue;const x=d.x,y=d.y,s=d.s;
+  switch(d.k){
+   case 'tree':shadow(x,y,22*s,0.3);ctx.fillStyle='#6b4a2a';ctx.fillRect(x-4*s,y-26*s,8*s,26*s);ctx.fillStyle=d.h<0.5?'#3f8f34':'#4f9e3a';
+    for(const [ox,oy,r] of [[0,-44,22],[-15,-32,16],[15,-32,16]]){ctx.beginPath();ctx.arc(x+ox*s,y+oy*s,r*s,0,TAU);ctx.fill();}
+    ctx.fillStyle='rgba(255,255,255,.12)';ctx.beginPath();ctx.arc(x-6*s,y-50*s,8*s,0,TAU);ctx.fill();break;
+   case 'flowers':for(let k=0;k<4;k++){ctx.fillStyle=['#ffe14d','#ff7aa8','#ffffff','#b07ae0'][(k+Math.floor(d.h*4))%4];ctx.beginPath();ctx.arc(x+(hsh(k+d.x)-0.5)*24,y+(hsh(k+d.y)-0.5)*14,2.6,0,TAU);ctx.fill();}break;
+   case 'gnome':shadow(x,y,8,0.25);drawFigure('gnome',x,y-Math.abs(Math.sin(t*3+d.h*9))*2,11*s,{flip:d.h<0.5});break;
+   case 'well':shadow(x,y,22,0.3);ctx.fillStyle='#8f8f97';ctx.fillRect(x-18,y-18,36,18);ctx.strokeStyle='#45454c';ctx.lineWidth=2;ctx.strokeRect(x-18,y-18,36,18);
+    ctx.fillStyle='#244a7a';ctx.fillRect(x-13,y-18,26,5);ctx.strokeStyle='#5a3a1e';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x-16,y-18);ctx.lineTo(x-16,y-44);ctx.lineTo(x+16,y-44);ctx.lineTo(x+16,y-18);ctx.stroke();
+    ctx.fillStyle='#7a2a1a';ctx.beginPath();ctx.moveTo(x-22,y-42);ctx.lineTo(x,y-56);ctx.lineTo(x+22,y-42);ctx.closePath();ctx.fill();break;
+   case 'hay':shadow(x,y,16,0.25);ctx.fillStyle='#d8b64a';ctx.beginPath();ctx.ellipse(x,y-10*s,16*s,11*s,0,0,TAU);ctx.fill();ctx.strokeStyle='#a8862a';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x-10*s,y-16*s);ctx.lineTo(x+10*s,y-4*s);ctx.stroke();break;
+   case 'shelf':shadow(x,y,26,0.3);ctx.fillStyle='#5a3418';ctx.fillRect(x-26,y-50,52,50);
+    for(let r=0;r<3;r++)for(let k=0;k<6;k++){ctx.fillStyle=['#b0202a','#2a5ab0','#2a8a4a','#d8b64a','#7a3ab0'][(k+r+Math.floor(d.h*5))%5];ctx.fillRect(x-23+k*8,y-47+r*16,6,13);}
+    ctx.strokeStyle='#2b1608';ctx.lineWidth=2;ctx.strokeRect(x-26,y-50,52,50);break;
+   case 'desk':shadow(x,y,26,0.3);ctx.fillStyle='#7a4a28';ctx.fillRect(x-28,y-22,56,16);ctx.fillRect(x-24,y-6,6,6);ctx.fillRect(x+18,y-6,6,6);
+    ctx.fillStyle='#f4ecd8';ctx.fillRect(x-14,y-26,18,6);ctx.fillStyle='#ffe680';ctx.beginPath();ctx.arc(x+16,y-30,3+Math.sin(t*9+d.h*5),0,TAU);ctx.fill();
+    ctx.fillStyle='#e8e2cc';ctx.fillRect(x+14,y-27,4,6);break;
+   case 'rug':ctx.fillStyle='#7a1a3a';ctx.beginPath();ctx.ellipse(x,y,60*s,32*s,0,0,TAU);ctx.fill();ctx.strokeStyle='#e0b84f';ctx.lineWidth=3;ctx.stroke();
+    ctx.beginPath();ctx.ellipse(x,y,40*s,20*s,0,0,TAU);ctx.stroke();break;
+   case 'ruin':shadow(x,y,20,0.3);ctx.fillStyle='#9a968c';ctx.fillRect(x-10,y-40*s,20,40*s);ctx.fillStyle='#6e6a62';ctx.beginPath();ctx.moveTo(x-10,y-40*s);ctx.lineTo(x-2,y-48*s);ctx.lineTo(x+4,y-38*s);ctx.lineTo(x+10,y-44*s);ctx.lineTo(x+10,y-40*s);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#5e8a3a';ctx.fillRect(x-10,y-12,20,4);ctx.fillStyle='#8c877c';ctx.fillRect(x+12,y-8,12,8);break;
+   case 'gem':{const c=['#ff4a6a','#3ef0e0','#9b51e0','#5fd068'][Math.floor(d.h*4)],g=0.6+0.4*Math.sin(t*4+d.h*20);ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=0.3*g;ctx.fillStyle=c;ctx.beginPath();ctx.arc(x,y-8,14,0,TAU);ctx.fill();ctx.restore();
+    ctx.fillStyle=c;ctx.beginPath();ctx.moveTo(x,y-20*s);ctx.lineTo(x+7*s,y-8*s);ctx.lineTo(x,y);ctx.lineTo(x-7*s,y-8*s);ctx.closePath();ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.stroke();break;}
+   case 'bones':ctx.strokeStyle='#e8e2cc';ctx.lineWidth=3;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x-10,y-2);ctx.lineTo(x+10,y-6);ctx.moveTo(x-6,y-10);ctx.lineTo(x+4,y+2);ctx.stroke();
+    ctx.fillStyle='#e8e2cc';ctx.beginPath();ctx.arc(x+14,y-8,5,0,TAU);ctx.fill();break;
+   case 'reeds':ctx.strokeStyle='#6a8a3a';ctx.lineWidth=2;ctx.beginPath();for(let k=0;k<5;k++){const ox=(k-2)*4,sw=Math.sin(t*1.5+d.h*7+k)*3;ctx.moveTo(x+ox,y);ctx.lineTo(x+ox+sw,y-22*s-k%2*6);}ctx.stroke();
+    ctx.fillStyle='#5a3a1e';ctx.fillRect(x-1+Math.sin(t*1.5+d.h*7)*3,y-26*s,3,7);break;
+   case 'pool':ctx.fillStyle='#1e3a34';ctx.beginPath();ctx.ellipse(x,y,46*s,24*s,0,0,TAU);ctx.fill();ctx.strokeStyle='#4a7a3a';ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle='#5fa448';ctx.beginPath();ctx.arc(x+14*s,y-4,6,0.4,TAU-0.4);ctx.fill();break;
+   case 'deadtree':shadow(x,y,14,0.3);ctx.strokeStyle='#2e2418';ctx.lineWidth=6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y-46*s);ctx.moveTo(x,y-30*s);ctx.lineTo(x-16*s,y-46*s);
+    ctx.moveTo(x,y-38*s);ctx.lineTo(x+14*s,y-56*s);ctx.stroke();break;
+   case 'statue':shadow(x,y,18,0.35);ctx.fillStyle='#2a2228';ctx.fillRect(x-16,y-14,32,14);ctx.strokeStyle=th.gold;ctx.lineWidth=2;ctx.strokeRect(x-16,y-14,32,14);
+    drawFigure('guard',x,y-14,15,{tint:'#5a5560',flip:d.h<0.5});break;
+   case 'banner':{ctx.fillStyle='#3a2a2a';ctx.fillRect(x-1,y-60,3,60);const w=Math.sin(t*2+d.h*8)*3;ctx.fillStyle=th.carpet;ctx.beginPath();ctx.moveTo(x+2,y-58);ctx.lineTo(x+26+w,y-56);ctx.lineTo(x+22+w,y-34);ctx.lineTo(x+2,y-36);ctx.closePath();ctx.fill();
+    ctx.strokeStyle=th.gold;ctx.lineWidth=1.5;ctx.stroke();ctx.fillStyle=th.gold;ctx.beginPath();ctx.arc(x+13+w*0.5,y-46,4,0,TAU);ctx.fill();break;}
+  }}
+}
 function drawGround(){
  const th=G.theme,T=100,x0=Math.max(0,Math.floor(cam.x/T)),y0=Math.max(0,Math.floor(cam.y/T)),x1=Math.min(WORLD/T,Math.ceil((cam.x+VW)/T)),y1=Math.min(WORLD/T,Math.ceil((cam.y+VH)/T));
- for(let i=x0;i<x1;i++)for(let j=y0;j<y1;j++){ctx.fillStyle=(i+j)%2?th.tileB:th.tileA;ctx.fillRect(i*T,j*T,T,T);}
- if(th.maze){ctx.strokeStyle='rgba(224,184,79,.18)';ctx.lineWidth=1;for(let i=x0;i<x1;i++)for(let j=y0;j<y1;j++)if((i+j)%2===0)ctx.strokeRect(i*T+3,j*T+3,T-6,T-6);}
+ if(th.ground)drawFantasyGround(th,x0,y0,x1,y1,T);
+ else for(let i=x0;i<x1;i++)for(let j=y0;j<y1;j++){ctx.fillStyle=(i+j)%2?th.tileB:th.tileA;ctx.fillRect(i*T,j*T,T,T);}
+ if(th.maze&&!th.ground){ctx.strokeStyle='rgba(224,184,79,.18)';ctx.lineWidth=1;for(let i=x0;i<x1;i++)for(let j=y0;j<y1;j++)if((i+j)%2===0)ctx.strokeRect(i*T+3,j*T+3,T-6,T-6);}
  ctx.strokeStyle=th.border;ctx.lineWidth=40;ctx.strokeRect(-20,-20,WORLD+40,WORLD+40);
  ctx.strokeStyle=th.edge;ctx.lineWidth=3;ctx.strokeRect(-2,-2,WORLD+4,WORLD+4);
 }
@@ -1422,6 +1775,7 @@ function drawStructures(){
   if(s.x>cam.x+VW+20||s.x+s.w<cam.x-20||s.y>cam.y+VH+20||s.y+s.h<cam.y-20)continue;
   ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(s.x+6,s.y+8,s.w,s.h);
   const th=G.theme;
+  if(th.ground&&drawFantasyStruct(s,th))continue;
   if(s.k==='maze'){   // endgame maze walls: black stone, white inlay, gold trim
    ctx.fillStyle=th.stoneDark;ctx.fillRect(s.x,s.y,s.w,s.h);ctx.strokeStyle=th.gold||th.edge;ctx.lineWidth=2;ctx.strokeRect(s.x+1,s.y+1,s.w-2,s.h-2);
    ctx.fillStyle=th.accent||'#fff';const L=Math.max(s.w,s.h);
@@ -1446,16 +1800,51 @@ function drawStructures(){
   }
  }
 }
+// R59 fantasy building skins. Returns true when it drew the structure.
+function drawFantasyStruct(s,th){
+ const k=s.k;
+ if(k==='maze'){ctx.fillStyle=th.stoneDark;ctx.fillRect(s.x,s.y,s.w,s.h);ctx.strokeStyle=th.gold;ctx.lineWidth=2;ctx.strokeRect(s.x+1,s.y+1,s.w-2,s.h-2);   // castle hall walls
+  const L2=Math.max(s.w,s.h);ctx.fillStyle=th.carpet;for(let q=30;q<L2-30;q+=90){if(s.w>s.h)ctx.fillRect(s.x+q,s.y+4,14,s.h-8);else ctx.fillRect(s.x+4,s.y+q,s.w-8,14);}return true;}
+ if(k==='pillar'){const cx=s.x+s.w/2,cy=s.y+s.h/2,statue=hsh(s.x)<0.4;
+  ctx.fillStyle='#1a1418';ctx.fillRect(s.x,s.y,s.w,s.h);ctx.strokeStyle=th.gold;ctx.lineWidth=2;ctx.strokeRect(s.x,s.y,s.w,s.h);
+  if(statue)drawFigure('tyrantKing',cx,cy+12,13,{tint:'#4a4450'});
+  else{ctx.fillStyle='#2e2630';ctx.beginPath();ctx.arc(cx,cy,15,0,TAU);ctx.fill();ctx.stroke();ctx.fillStyle=th.carpet;ctx.beginPath();ctx.arc(cx,cy,6,0,TAU);ctx.fill();}return true;}
+ if(k==='house'){const h=th.house;
+  if(h==='gnome'){const cx=s.x+s.w/2,cy=s.y+s.h/2,r=Math.min(s.w,s.h)/2;   // mushroom gnome house
+   ctx.fillStyle=s.c;ctx.fillRect(cx-r*0.55,cy-r*0.1,r*1.1,r*0.95);ctx.strokeStyle='#5a4a30';ctx.lineWidth=2;ctx.strokeRect(cx-r*0.55,cy-r*0.1,r*1.1,r*0.95);
+   ctx.fillStyle='#6b4a2a';ctx.fillRect(cx-r*0.15,cy+r*0.35,r*0.3,r*0.5);
+   ctx.fillStyle=th.roof;ctx.beginPath();ctx.ellipse(cx,cy-r*0.1,r*1.05,r*0.75,0,Math.PI,0);ctx.closePath();ctx.fill();ctx.stroke();
+   ctx.fillStyle='#fff';for(const [a,b,q] of [[-0.5,-0.4,0.14],[0.3,-0.55,0.12],[0.6,-0.25,0.1],[-0.1,-0.7,0.1]]){ctx.beginPath();ctx.arc(cx+a*r,cy+b*r,q*r,0,TAU);ctx.fill();}return true;}
+  if(h==='shelf'){ctx.fillStyle='#5a3418';ctx.fillRect(s.x,s.y,s.w,s.h);ctx.strokeStyle='#2b1608';ctx.lineWidth=3;ctx.strokeRect(s.x,s.y,s.w,s.h);   // bookshelf
+   const rows=Math.max(2,Math.floor(s.h/18));for(let r=0;r<rows;r++){const y=s.y+4+r*(s.h-8)/rows;for(let x=s.x+4,k=0;x<s.x+s.w-8;k++){const w=5+hsh(k+r*31+s.x)*6;
+    ctx.fillStyle=['#b0202a','#2a5ab0','#2a8a4a','#d8b64a','#7a3ab0','#c06a2a'][(k+r)%6];ctx.fillRect(x,y,w,(s.h-8)/rows-3);x+=w+1;}}return true;}
+  if(h==='ruin'){ctx.fillStyle=s.c;ctx.beginPath();ctx.moveTo(s.x,s.y+s.h);ctx.lineTo(s.x,s.y+s.h*0.2);ctx.lineTo(s.x+s.w*0.3,s.y);ctx.lineTo(s.x+s.w*0.45,s.y+s.h*0.3);
+   ctx.lineTo(s.x+s.w*0.7,s.y+s.h*0.1);ctx.lineTo(s.x+s.w,s.y+s.h*0.35);ctx.lineTo(s.x+s.w,s.y+s.h);ctx.closePath();ctx.fill();ctx.strokeStyle=th.stoneLine;ctx.lineWidth=2;ctx.stroke();
+   ctx.strokeStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.moveTo(s.x+s.w*0.3,s.y+s.h*0.4);ctx.lineTo(s.x+s.w*0.4,s.y+s.h*0.7);ctx.lineTo(s.x+s.w*0.32,s.y+s.h);ctx.stroke();
+   ctx.fillStyle='#5e8a3a';ctx.fillRect(s.x,s.y+s.h-6,s.w*0.6,6);return true;}
+  if(h==='witchhut'){ctx.fillStyle='#2a2018';for(const fx of [0.15,0.85])ctx.fillRect(s.x+s.w*fx-3,s.y+s.h*0.6,6,s.h*0.4);   // hut on stilts
+   ctx.fillStyle=s.c;ctx.fillRect(s.x,s.y+s.h*0.25,s.w,s.h*0.45);ctx.strokeStyle='#1e1410';ctx.lineWidth=2;ctx.strokeRect(s.x,s.y+s.h*0.25,s.w,s.h*0.45);
+   ctx.fillStyle='#1e1410';ctx.beginPath();ctx.moveTo(s.x-6,s.y+s.h*0.28);ctx.lineTo(s.x+s.w*0.45,s.y-s.h*0.1);ctx.lineTo(s.x+s.w+6,s.y+s.h*0.28);ctx.closePath();ctx.fill();
+   ctx.fillStyle=`rgba(155,224,74,${0.6+0.3*Math.sin(G.time*3+s.x)})`;ctx.fillRect(s.x+s.w*0.4,s.y+s.h*0.35,s.w*0.2,s.h*0.15);return true;}
+  // wooden house (village; also castle side rooms)
+  ctx.fillStyle=s.c;ctx.fillRect(s.x,s.y,s.w,s.h);ctx.strokeStyle='#2a1808';ctx.lineWidth=2;ctx.strokeRect(s.x,s.y,s.w,s.h);
+  ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=1;ctx.beginPath();for(let x=s.x+10;x<s.x+s.w;x+=12){ctx.moveTo(x,s.y);ctx.lineTo(x,s.y+s.h);}ctx.stroke();
+  ctx.fillStyle=th.roof;ctx.beginPath();if(s.w>s.h){ctx.moveTo(s.x-4,s.y+s.h*0.5);ctx.lineTo(s.x+s.w*0.5,s.y-6);ctx.lineTo(s.x+s.w+4,s.y+s.h*0.5);ctx.lineTo(s.x+s.w*0.5,s.y+s.h*0.5-6);}
+  else{ctx.moveTo(s.x+s.w*0.5,s.y-4);ctx.lineTo(s.x+s.w+6,s.y+s.h*0.5);ctx.lineTo(s.x+s.w*0.5,s.y+s.h+4);ctx.lineTo(s.x+s.w*0.5-6,s.y+s.h*0.5);}ctx.closePath();ctx.fill();
+  ctx.fillStyle='#ffe28a';ctx.fillRect(s.x+s.w*0.2,s.y+s.h*0.6,8,8);return true;}
+ return false;   // walls, towers and keeps use the stone drawing in the floor's colours
+}
 function drawWatchtower(e){
  const x=e.x,y=e.y,s=e.s,t=G.time;
  shadow(x,y,s*1.3,0.35);
- ctx.fillStyle=e.flash>0?'#b83a2e':'#1e1412';ctx.strokeStyle='#ff8a3c';ctx.lineWidth=2;
+ const wc=LOOK==='chess';   // fantasy: a mossy witch tower with green witch fire
+ ctx.fillStyle=e.flash>0?'#b83a2e':wc?'#1e1412':'#2a3028';ctx.strokeStyle=wc?'#ff8a3c':'#9be04a';ctx.lineWidth=2;
  ctx.beginPath();ctx.moveTo(x-s,y);ctx.lineTo(x-s*0.8,y-s*2.4);ctx.lineTo(x+s*0.8,y-s*2.4);ctx.lineTo(x+s,y);ctx.closePath();ctx.fill();ctx.stroke();
  for(let k=-1;k<=1;k++){ctx.fillRect(x+k*s*0.6-s*0.22,y-s*2.85,s*0.44,s*0.5);ctx.strokeRect(x+k*s*0.6-s*0.22,y-s*2.85,s*0.44,s*0.5);}
- ctx.fillStyle='#ff6a1a';ctx.fillRect(x-s*0.18,y-s*1.7,s*0.36,s*0.6);   // glowing arrow slit
+ ctx.fillStyle=wc?'#ff6a1a':'#9be04a';ctx.fillRect(x-s*0.18,y-s*1.7,s*0.36,s*0.6);   // glowing arrow slit
  const fl=0.7+0.3*Math.sin(t*14+e.phase);ctx.save();ctx.globalCompositeOperation='lighter';
- ctx.fillStyle=`rgba(255,140,40,${0.35*fl})`;ctx.beginPath();ctx.arc(x,y-s*3.1,s*0.9*fl,0,TAU);ctx.fill();
- ctx.fillStyle=`rgba(255,220,120,${0.6*fl})`;ctx.beginPath();ctx.arc(x,y-s*3.05,s*0.4*fl,0,TAU);ctx.fill();ctx.restore();
+ ctx.fillStyle=wc?`rgba(255,140,40,${0.35*fl})`:`rgba(110,220,60,${0.35*fl})`;ctx.beginPath();ctx.arc(x,y-s*3.1,s*0.9*fl,0,TAU);ctx.fill();
+ ctx.fillStyle=wc?`rgba(255,220,120,${0.6*fl})`:`rgba(210,255,150,${0.6*fl})`;ctx.beginPath();ctx.arc(x,y-s*3.05,s*0.4*fl,0,TAU);ctx.fill();ctx.restore();
  if(Math.random()<0.3)particle('ember',x+rand(-s*0.5,s*0.5),y-s*3,'#ffb347',{a:-Math.PI/2+rand(-0.4,0.4),v:rand(30,70),dur:0.6,sz:rand(2,4)});
  if(e.hp<e.maxHp)bar(x-s,y-s*3.7,s*2,4,e.hp/e.maxHp,'#ff7a2a');
 }
@@ -1477,8 +1866,11 @@ function drawEnemy(e){
  if(e.type==='rook'&&e.st==='wind'){ctx.strokeStyle='rgba(255,60,40,.45)';ctx.lineWidth=e.r*2;ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(e.x+Math.sign(e.vx)*500,e.y+Math.sign(e.vy)*500);ctx.stroke();}
  const glow=e.charmT>0?'rgba(255,79,216,.8)':e.frozenT>0?'rgba(190,235,255,.85)':e.despairT>0?'rgba(140,140,140,.8)':e.boss&&e.enraged?'rgba(255,40,40,.75)':e.buffT>0?'rgba(255,215,0,.55)':e.weakT>0?'rgba(255,119,153,.7)':e.slowT>0?'rgba(127,216,255,.65)':e.dashing?'rgba(255,90,60,.6)':e.dots&&e.dots.length?'rgba(190,140,255,.45)':null;
  const charmed=e.charmT>0,frozen=e.frozenT>0;
- drawPiece(e.type,e.x+ox,e.y-bob-e.z,e.s,{fill:e.flash>0?'#b83a2e':(e.boss?CHECK:charmed?'#f6eef6':frozen?'#9fd8f0':'#24242b'),stroke:e.boss?'#e0b84f':charmed?'#ff4fd8':frozen?'#e9fbff':'#a8a8b8',lw:e.boss?3:1.5,rot,
+ if(LOOK==='chess')drawPiece(e.type,e.x+ox,e.y-bob-e.z,e.s,{fill:e.flash>0?'#b83a2e':(e.boss?CHECK:charmed?'#f6eef6':frozen?'#9fd8f0':'#24242b'),stroke:e.boss?'#e0b84f':charmed?'#ff4fd8':frozen?'#e9fbff':'#a8a8b8',lw:e.boss?3:1.5,rot,
   sx:e.flash>0?1.1:1,sy:e.flash>0?0.9:1,flip:P.x<e.x,glow,eye:e.boss?'#ff3030':'#ff5050'});
+ else drawFigure(e.boss?BOSS_LOOK[e.type]:ENEMY_LOOK[e.type],e.x+ox,e.y-bob-e.z,e.s,{tint:e.flash>0?'#e05a48':frozen?'#a8def4':null,rot:e.sleepT>0?0.25:rot,
+  sx:e.flash>0?1.1:1,sy:e.flash>0?0.9:1,flip:P.x<e.x,glow:glow||(e.boss?'rgba(224,184,79,.3)':null),lw:e.boss?2.4:1.3,flap:0.5+0.5*Math.sin(t*5+e.phase)});
+ if(e.sleepT>0)for(let k=0;k<3;k++){const q=(t*0.8+k/3)%1;ctx.globalAlpha=1-q;txt('z',e.x+e.s*0.6+q*14,e.y-e.s*2.6-e.z-q*26,10+k*3,'#ffd0f4','center');ctx.globalAlpha=1;}   // R71 asleep
  if(e.charmT>0){ctx.strokeStyle='#ff4fd8';ctx.lineWidth=2;for(let k=0;k<3;k++){const q=G.time*6+k*TAU/3;ctx.beginPath();ctx.arc(e.x+Math.cos(q)*e.s*0.7,e.y-e.s*2.9-bob-e.z+Math.sin(q)*4,2.5,0,TAU);ctx.stroke();}}
  if(!e.boss&&e.hp<e.maxHp){const w=e.s*2;bar(e.x-w/2,e.y-e.s*2.7-bob-e.z,w,4,e.hp/e.maxHp,'#d33');}
 }
@@ -1494,12 +1886,19 @@ function drawCart(){
  ctx.beginPath();for(let k=-52+26;k<52;k+=26){ctx.moveTo(k,-34);ctx.lineTo(k,-2);}ctx.stroke();
  ctx.fillStyle='#e0b84f';ctx.fillRect(-56,-38,112,5);
  ctx.strokeStyle='#2b1a0e';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-48,-38);ctx.lineTo(-48,-74);ctx.moveTo(48,-38);ctx.lineTo(48,-74);ctx.stroke();
- for(let k=0;k<8;k++){ctx.fillStyle=k%2?'#151515':'#ece6d6';ctx.beginPath();ctx.moveTo(-60+k*15,-74);ctx.lineTo(-45+k*15,-74);ctx.lineTo(-45+k*15+2,-62);ctx.lineTo(-60+k*15+2,-62);ctx.closePath();ctx.fill();}   // checkered canopy
+ for(let k=0;k<8;k++){ctx.fillStyle=k%2?L('#b0202a','#151515'):L('#f4ecd8','#ece6d6');ctx.beginPath();ctx.moveTo(-60+k*15,-74);ctx.lineTo(-45+k*15,-74);ctx.lineTo(-45+k*15+2,-62);ctx.lineTo(-60+k*15+2,-62);ctx.closePath();ctx.fill();}   // checkered canopy
  ctx.strokeStyle='#e0b84f';ctx.lineWidth=2;ctx.strokeRect(-60,-80,120,6);
- drawShard(0,-96+Math.sin(t*3)*4,9,Math.sin(t*2)*0.3);   // floating fragment sign
+ drawLoot(0,-96+Math.sin(t*3)*4,9,Math.sin(t*2)*0.3);   // floating sign: a gold bar (fantasy) or a fragment (chess)
  ctx.restore();
  for(const p of c.pawns){const b=Math.abs(Math.sin(t*4+p.ph))*4,sw=Math.sin(t*2+p.ph)*0.08;   // 3 white pawn merchants
-  shadow(x+p.dx,y+p.dy,13,0.28);drawPiece('pawn',x+p.dx,y+p.dy-b,13*pop,{fill:'#f6f2e6',stroke:'#2b2b2b',lw:2,rot:sw,flip:p.dx>0,eye:'#2b2b2b'});}
+  shadow(x+p.dx,y+p.dy,13,0.28);
+  if(LOOK==='chess')drawPiece('pawn',x+p.dx,y+p.dy-b,13*pop,{fill:'#f6f2e6',stroke:'#2b2b2b',lw:2,rot:sw,flip:p.dx>0,eye:'#2b2b2b'});
+  else drawFigure('merchant',x+p.dx,y+p.dy-b,13*pop,{rot:sw,flip:p.dx>0});}   // R61 merchants
+}
+const drawLoot=(x,y,s,rot)=>LOOK==='chess'?drawShard(x,y,s,rot):drawGoldBar(x,y,s,rot);   // R48 / R64
+function drawCorpse(c){   // R63: tipping over, then fading just before the puff
+ const f=c.t>c.dur*0.7?1-(c.t-c.dur*0.7)/(c.dur*0.3):1;ctx.globalAlpha=clamp(f,0,1);
+ shadow(c.x,c.y,c.s,0.2);drawFigure(c.fig,c.x,c.y,c.s,{rot:corpseAngle(c),flip:c.flip,rank:c.rank,lw:c.boss?2.4:1.3});ctx.globalAlpha=1;
 }
 // A chess-piece fragment: an ivory shard with a darker facet and a glint (R48).
 function drawShard(x,y,s,rot){
@@ -1518,7 +1917,8 @@ function drawPlayer(){
  for(const o of G.orbs)for(let k=0;k<o.n;k++){const a=o.a+k*TAU/o.n,x=P.x+Math.cos(a)*o.r,y=P.y+Math.sin(a)*o.r-14;ctx.fillStyle=o.color;ctx.beginPath();ctx.arc(x,y,11,0,TAU);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();}
  if(P.iframes>0&&Math.floor(t*20)%2)ctx.globalAlpha=0.5;
  const glow=P.charge>=1?`rgba(224,184,79,${0.6+0.4*Math.sin(t*20)})`:P.charging?'rgba(224,184,79,.35)':null;
- drawPiece(type,P.x,P.y-bob,s,{fill:P.hurt>0?'#ffb0b0':'#f6f2e6',stroke:'#2b2b2b',lw:2,rot,flip:Math.cos(P.aim)<0,glow,eye:'#2b2b2b'});
+ if(LOOK==='chess')drawPiece(type,P.x,P.y-bob,s,{fill:P.hurt>0?'#ffb0b0':'#f6f2e6',stroke:'#2b2b2b',lw:2,rot,flip:Math.cos(P.aim)<0,glow,eye:'#2b2b2b'});
+ else drawFigure(playerClass(),P.x,P.y-bob,s,{tint:P.hurt>0?'#ffb0b0':null,rot,flip:Math.cos(P.aim)<0,glow,rank:P.form,lw:1.6});   // R56
  ctx.globalAlpha=1;
  // weapon
  let a=P.aim+(P.swingT>0&&G.weapon!=='bow'&&G.weapon!=='tome'?(P.swingT/0.15-0.5)*1.6:0);
@@ -1587,6 +1987,12 @@ const PART_DRAW={
   ctx.quadraticCurveTo(p.x+s*0.6+w,p.y+s,p.x+w,p.y+s*1.6);ctx.quadraticCurveTo(p.x-s*0.6+w,p.y+s,p.x-s*0.6,p.y);ctx.closePath();ctx.fill();},
  leaf(p){const s=p.sz;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.beginPath();ctx.ellipse(0,0,s,s*0.45,0,0,TAU);ctx.fill();
   ctx.strokeStyle='#2c5e22';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-s,0);ctx.lineTo(s,0);ctx.stroke();ctx.restore();},
+ rock(p){const s=p.sz;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.beginPath();   // R66 rock chunk
+  ctx.moveTo(-s*0.6,-s*0.2);ctx.lineTo(-s*0.15,-s*0.6);ctx.lineTo(s*0.55,-s*0.35);ctx.lineTo(s*0.6,s*0.3);ctx.lineTo(-s*0.1,s*0.55);ctx.lineTo(-s*0.55,s*0.3);ctx.closePath();
+  ctx.fill();ctx.strokeStyle='#3a2410';ctx.lineWidth=1;ctx.stroke();ctx.restore();},
+ crack(p){const s=p.sz;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.lineWidth=2;ctx.lineCap='round';ctx.beginPath();   // R66 ground crack
+  ctx.moveTo(-s,0);ctx.lineTo(-s*0.4,-s*0.2);ctx.lineTo(0,s*0.15);ctx.lineTo(s*0.5,-s*0.1);ctx.lineTo(s,s*0.1);ctx.moveTo(0,s*0.15);ctx.lineTo(s*0.15,s*0.6);ctx.stroke();ctx.restore();},
+ poof(p,l){ctx.globalAlpha=l*0.7;ctx.beginPath();ctx.arc(p.x,p.y,p.sz*(1.4-l*0.6),0,TAU);ctx.fill();},   // R63 puff of smoke
  cloud(p,l){const s=p.sz;ctx.globalAlpha=l*0.55;ctx.fillStyle='#eef6f2';ctx.beginPath();ctx.arc(p.x-s*0.5,p.y,s*0.55,0,TAU);ctx.arc(p.x+s*0.5,p.y,s*0.5,0,TAU);
   ctx.arc(p.x,p.y-s*0.35,s*0.65,0,TAU);ctx.fill();ctx.globalAlpha=l*0.35;ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(p.x,p.y+s*0.1,s*0.5,0,TAU);ctx.fill();},
 };
@@ -1599,7 +2005,7 @@ function drawParticles(){
  ctx.restore();ctx.globalAlpha=1;
 }
 // Element area effect at (x,y) with radius r. a = opacity (0..1), p = progress (0..1), flash = short burst.
-// Returns the style drawn so tests can check it. Hyper, light and earth keep the Round 2 look ('plain').
+// Returns the style drawn so tests can check it. Hyper and light keep the Round 2 look ('plain'); earth is solid brown (R66).
 function drawArea(el,x,y,r,a,p,flash){
  const st=EL_AREA[el]||'plain',c=EL_COL[el]||'#fff',t=G.time;p=p||0;
  const circ=rr=>{ctx.beginPath();ctx.arc(x,y,rr,0,TAU);};
@@ -1680,6 +2086,11 @@ function drawArea(el,x,y,r,a,p,flash){
    for(let k=0;k<n;k++){const q=hsh(k)*TAU,rr=Math.sqrt(hsh(k+1))*r*0.75;ctx.globalAlpha=a*0.2;ctx.fillStyle=k%2?'#f2f6f7':'#a9b7be';ctx.beginPath();
     ctx.arc(x+Math.cos(q)*rr+Math.sin(t*0.5+k)*r*0.1,y+Math.sin(q)*rr+Math.cos(t*0.4+k)*r*0.06,r*(0.22+0.2*hsh(k+2)),0,TAU);ctx.fill();}
    break;}
+  case 'solid':{ctx.globalAlpha=a*0.85;ctx.fillStyle='#7a5230';circ(r);ctx.fill();   // R66: solid brown earth
+   ctx.globalAlpha=a*0.9;ctx.strokeStyle='#4a3018';ctx.lineWidth=4;ctx.stroke();ctx.lineWidth=2;ctx.beginPath();
+   for(let k=0;k<6;k++){let q=k/6*TAU+hsh(k+90),px=x+Math.cos(q)*r*0.15,py=y+Math.sin(q)*r*0.15;ctx.moveTo(px,py);for(let s2=1;s2<=3;s2++){q+=(hsh(k*7+s2)-0.5)*0.7;px=x+Math.cos(q)*r*(0.15+s2*0.27);py=y+Math.sin(q)*r*(0.15+s2*0.27);ctx.lineTo(px,py);}}ctx.stroke();
+   ctx.fillStyle='#5e3e22';for(let k=0;k<8;k++){const q=hsh(k+30)*TAU,rr=Math.sqrt(hsh(k+31))*r*0.8;ctx.beginPath();ctx.arc(x+Math.cos(q)*rr,y+Math.sin(q)*rr,3+hsh(k+32)*r*0.06,0,TAU);ctx.fill();}
+   break;}
   default:ctx.globalAlpha=a*(flash?0.45:0.16);ctx.fillStyle=c;circ(r);ctx.fill();
  }
  ctx.restore();
@@ -1724,7 +2135,7 @@ function drawWorldFx(){
  // pickups
  for(const p of G.pickups){if(!onScreen(p.x,p.y,20))continue;
   if(p.k==='xp'){ctx.fillStyle='#5fd0ff';ctx.beginPath();ctx.moveTo(p.x,p.y-7);ctx.lineTo(p.x+5,p.y);ctx.lineTo(p.x,p.y+7);ctx.lineTo(p.x-5,p.y);ctx.closePath();ctx.fill();ctx.strokeStyle='#103040';ctx.lineWidth=1;ctx.stroke();}
-  else drawShard(p.x,p.y,6,(p.rot||0)+Math.sin(G.time*3+p.x)*0.3);}
+  else drawLoot(p.x,p.y,6,(p.rot||0)+Math.sin(G.time*3+p.x)*0.3);}
 }
 // Grandmaster ritual visuals. The ground layer goes under the pieces, the rest above them.
 function drawRitualGround(){
@@ -1806,7 +2217,8 @@ function drawProjAndFx(){
     for(let k=0;k<f.n;k++){const q=k*TAU/f.n+p*0.6;ctx.moveTo(f.x+Math.cos(q)*f.r*0.3*(1+p),f.y+Math.sin(q)*f.r*0.3*(1+p));ctx.lineTo(f.x+Math.cos(q)*f.r*(0.6+0.4*p),f.y+Math.sin(q)*f.r*(0.6+0.4*p));}ctx.stroke();break;
    case 'rect':ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.a);ctx.fillStyle=f.color;ctx.globalAlpha=(1-p)*0.5;ctx.fillRect(0,-f.w/2,f.len*Math.min(1,p*4),f.w);
     ctx.globalAlpha=1-p;ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.strokeRect(0,-f.w/2,f.len,f.w);ctx.restore();break;
-   case 'ghost':ctx.globalAlpha=(1-p)*0.45;drawPiece(f.form,f.x,f.y,15+P.form*0.7,{fill:'#dfe8ff',stroke:'#9fb0d0',lw:1.5});break;
+   case 'ghost':ctx.globalAlpha=(1-p)*0.45;if(LOOK==='chess')drawPiece(f.form,f.x,f.y,15+P.form*0.7,{fill:'#dfe8ff',stroke:'#9fb0d0',lw:1.5});
+    else drawFigure(playerClass(),f.x,f.y,15+P.form*0.7,{tint:'#dfe8ff',line:'#9fb0d0',rank:P.form,flip:Math.cos(P.aim)<0});break;
   }}
  ctx.globalAlpha=1;
  drawParticles();
@@ -1816,13 +2228,14 @@ function drawProjAndFx(){
 function drawHUD(){
  // player panel
  panel(12,12,330,100);
- drawPiece(FORMS[P.form],46,98,16,{fill:'#f6f2e6',stroke:'#2b2b2b',lw:2,eye:'#2b2b2b'});
- txt(FORM_NAMES[P.form]+' · Lv '+P.level,82,34,17,'#f4ecd8');
+ if(LOOK==='chess')drawPiece(FORMS[P.form],46,98,16,{fill:'#f6f2e6',stroke:'#2b2b2b',lw:2,eye:'#2b2b2b'});
+ else drawFigure(playerClass(),46,98,16,{rank:P.form});
+ txt(rankName()+' · Lv '+P.level,82,34,17,'#f4ecd8');
  bar(82,44,248,18,P.hp/P.maxHp,'#c33');
  if(P.shield>0){ctx.fillStyle='rgba(220,190,140,.7)';ctx.fillRect(82,44,248*clamp(P.shield/P.maxHp,0,1),6);}
  txt(Math.ceil(P.hp)+' / '+P.maxHp,206,58,12,'#fff','center');
  bar(82,68,248,8,P.xp/P.xpNext,'#5fd0ff');
- drawShard(90,93,7,0);txt(String(P.gold),102,98,15,'#f4ecd8','left');txt(WEAPONS[G.weapon].ico+' '+WEAPONS[G.weapon].name,186,98,15,'#e0b84f','left');
+ drawLoot(90,93,7,0);txt(String(P.gold),102,98,15,L('#ffd84a','#f4ecd8'),'left');txt(WEAPONS[G.weapon].ico+' '+WEAPONS[G.weapon].name,186,98,15,'#e0b84f','left');
  // score panel
  panel(VW-202,12,190,72);
  txt('Score '+G.score.toLocaleString(),VW-192,38,16,'#f4ecd8');
@@ -1832,24 +2245,25 @@ function drawHUD(){
  const cx=VW/2;
  if(G.phase==='wave'){const left=Math.max(0,Math.ceil(G.dur-G.floorTime));
   panel(cx-200,12,400,52);txt('FLOOR '+G.floor+' / 6 · '+G.theme.name.toUpperCase(),cx,34,18,'#e0b84f','center');
-  bar(cx-185,42,370,10,G.floorTime/G.dur,'#a98563');txt(BOSSES[G.floor-1].name+' arrives in '+left+'s',cx,78,13,'#f4ecd8','center');}
+  bar(cx-185,42,370,10,G.floorTime/G.dur,'#a98563');txt(bossName(BOSSES[G.floor-1])+' arrives in '+left+'s',cx,78,13,'#f4ecd8','center');}
  else if(G.phase==='boss'&&G.boss){const b=G.boss;
   panel(cx-260,12,520,56);txt('FLOOR '+G.floor+' · THE '+b.name.toUpperCase()+(b.enraged?' (ENRAGED)':''),cx,32,16,b.enraged?'#ff7070':'#e0b84f','center');
-  ctx.fillStyle=CHECK;ctx.save();ctx.translate(cx-245,40);ctx.scale(40,40);ctx.fillRect(0,0,490/40,16/40);ctx.restore();
+  if(LOOK==='chess'){ctx.fillStyle=CHECK;ctx.save();ctx.translate(cx-245,40);ctx.scale(40,40);ctx.fillRect(0,0,490/40,16/40);ctx.restore();}
   bar(cx-245,40,490,16,b.hp/b.maxHp,'#b0121b','rgba(0,0,0,.6)');txt(Math.ceil(b.hp).toLocaleString(),cx,53,12,'#fff','center');}
  else{panel(cx-170,12,340,40);txt('FLOOR '+G.floor+' · '+G.theme.name.toUpperCase()+' CLEARED',cx,38,17,'#e0b84f','center');
-  if(G.cart){txt('Visit the merchant cart in the centre of the board',cx,72,14,'#f4ecd8','center');
+  if(G.cart){txt(L("Visit the merchants' cart in the centre of the map",'Visit the merchant cart in the centre of the board'),cx,72,14,'#f4ecd8','center');
    const sx=G.cart.x-cam.x,sy=G.cart.y-cam.y;if(sx<0||sy<0||sx>VW||sy>VH){const a=Math.atan2(sy-VH/2,sx-VW/2),ax=VW/2+Math.cos(a)*Math.min(VW,VH)*0.38,ay=VH/2+Math.sin(a)*Math.min(VW,VH)*0.38;
     ctx.save();ctx.translate(ax,ay);ctx.rotate(a);ctx.fillStyle='#e0b84f';ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(18,0);ctx.lineTo(-10,-12);ctx.lineTo(-4,0);ctx.lineTo(-10,12);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
-    drawShard(ax,ay-24,7,0);}}}
+    drawLoot(ax,ay-24,7,0);}}}
  if(G.difficulty!=='normal')txt(diff().name.toUpperCase(),VW-22,100,12,G.difficulty==='hard'?'#ff7070':'#8fd08f','right');
  // spell slots
- const sw=72,gap=12,sx=cx-(sw*3+gap*2)/2,sy=VH-sw-16;
- for(let i=0;i<3;i++){const x=sx+i*(sw+gap),sp=P.spells[i];
+ const NS=P.spells.length,sw=68,gap=10,sx=cx-(sw*NS+gap*(NS-1))/2,sy=VH-sw-16;   // 5 slots (R76)
+ for(let i=0;i<NS;i++){const x=sx+i*(sw+gap),sp=P.spells[i];
   ctx.fillStyle='rgba(38,24,14,.88)';rr(x,sy,sw,sw,8);ctx.fill();
   if(sp){const d=SPELL_BY_ID[sp.id];ctx.strokeStyle=TIER_COL[d.tier];ctx.lineWidth=d.tier>=5?4:3;ctx.stroke();
-   ctx.fillStyle=spellCol(d);ctx.beginPath();ctx.arc(x+sw/2,sy+26,15,0,TAU);ctx.fill();ctx.strokeStyle='#111';ctx.lineWidth=2;ctx.stroke();
-   txt(d.tier===6?'♛':'★'.repeat(d.tier),x+sw/2,sy+(d.tier===6?32:30),d.tier===6?16:d.tier>3?9:10,'#111','center','normal ');
+   ctx.fillStyle='rgba(0,0,0,.4)';ctx.beginPath();ctx.arc(x+sw/2,sy+25,17,0,TAU);ctx.fill();
+   drawIcon(spellIcon(d),x+sw/2,sy+25,28,spellCol(d));   // R65: element icon instead of stars
+   if(d.tier<6)for(let k=0;k<d.tier;k++){ctx.fillStyle=TIER_COL[d.tier];ctx.beginPath();ctx.arc(x+sw/2+(k-(d.tier-1)/2)*7,sy+46,2.3,0,TAU);ctx.fill();}   // tier pips
    const words=d.name.split(' ');txt(words.slice(0,2).join(' ').slice(0,13),x+sw/2,sy+56,10,'#f4ecd8','center');
    txt('Lv'+sp.lvl,x+sw-4,sy+68,10,'#cdb98f','right');
    if(sp.cd>0){const f=sp.cd/(sp.cdMax||1);ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillRect(x+2,sy+2+(sw-4)*(1-f),sw-4,(sw-4)*f);txt(sp.cd.toFixed(1),x+sw/2,sy+44,18,'#fff','center');}}
@@ -1884,12 +2298,13 @@ function render(){
  ctx.fillStyle=G.theme.bg;ctx.fillRect(0,0,VW,VH);
  const sx=(Math.random()-0.5)*G.shake,sy=(Math.random()-0.5)*G.shake;
  ctx.save();ctx.translate(Math.round(-cam.x+sx),Math.round(-cam.y+sy));
- drawGround();drawWorldFx();drawRitualGround();drawStructures();
+ drawGround();drawWorldFx();drawRitualGround();drawStructures();if(G.theme.ground)drawDecor();
  const list=G.enemies.filter(e=>!e.dead&&onScreen(e.x,e.y,e.s*3+20));
  if(G.state!=='menu')list.push(P);
  if(G.cart)list.push({cart:true,y:G.cart.y});
+ for(const c of G.corpses)if(onScreen(c.x,c.y,c.s*3))list.push({corpse:c,y:c.y});
  list.sort((a,b)=>a.y-b.y);
- for(const e of list){if(e===P){if(G.state!=='over'||P.hp>0)drawPlayer();}else if(e.cart)drawCart();else drawEnemy(e);}
+ for(const e of list){if(e===P){if(G.state!=='over'||P.hp>0)drawPlayer();}else if(e.cart)drawCart();else if(e.corpse)drawCorpse(e.corpse);else drawEnemy(e);}
  drawRituals();drawProjAndFx();
  ctx.restore();
  if(G.screenFlash){ctx.globalAlpha=0.45*(1-G.screenFlash.t/G.screenFlash.dur);ctx.fillStyle=G.screenFlash.c;ctx.fillRect(0,0,VW,VH);ctx.globalAlpha=1;}
@@ -1907,7 +2322,7 @@ function frame(now){
  }else if(G.state==='menu'){
   G.time+=dt;cam.x=WORLD/2+Math.cos(G.time*0.08)*700-VW/2;cam.y=WORLD/2+Math.sin(G.time*0.06)*700-VH/2;
  }else if(G.state==='over'){
-  G.time+=dt;stepParticles(dt);G.shake*=0.9;
+  G.time+=dt;stepParticles(dt);stepCorpses(dt);G.shake*=0.9;
  }
  render();requestAnimationFrame(frame);
 }

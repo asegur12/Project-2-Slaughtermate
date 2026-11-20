@@ -1,11 +1,11 @@
-# Builds dist\Slaughtermate.exe using the C# compiler that ships with Windows (.NET Framework 4).
+# Builds dist\MagicRush.exe (the game was called Slaughtermate before Round 4) using the C# compiler that ships with Windows (.NET Framework 4).
 # Run from anywhere:  powershell -ExecutionPolicy Bypass -File desktop\build.ps1
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $dist = Join-Path $repo 'dist'
 New-Item -ItemType Directory -Force $dist | Out-Null
 
-# Generate a simple chess-pawn icon.
+# Generate a simple icon (a white figure on crimson).
 Add-Type -AssemblyName System.Drawing
 $icoPath = Join-Path $PSScriptRoot 'slaughtermate.ico'
 $bmp = New-Object System.Drawing.Bitmap 64, 64
@@ -24,10 +24,10 @@ $fs = [System.IO.File]::Create($icoPath); $icon.Save($fs); $fs.Close()
 
 $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 & $csc /nologo /target:winexe /optimize+ `
-    /out:"$dist\Slaughtermate.exe" `
+    /out:"$dist\MagicRush.exe" `
     /win32icon:"$icoPath" `
     /resource:"$repo\index.html,index.html" `
     /reference:System.Windows.Forms.dll `
     "$PSScriptRoot\Launcher.cs"
 if ($LASTEXITCODE -ne 0) { throw "csc failed ($LASTEXITCODE)" }
-Write-Host "Built $dist\Slaughtermate.exe"
+Write-Host "Built $dist\MagicRush.exe"
