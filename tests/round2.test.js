@@ -106,7 +106,8 @@ test('R18 boss telegraphs burst with sparks and debris when they land', () => {
 /* ---------- R19 - R26 floors ---------- */
 
 test('R19 every floor has its own theme and a freshly generated map', () => {
-  const g = startRun(loadGame({ seed: 19 }), 'sword');
+  // Amended in Round 4 (R59, R62): FLOOR_THEMES are the chess theme's floors; R59 tests the fantasy ones.
+  const g = startRun(loadGame({ seed: 19, storage: { slaughtermate_look: 'chess' } }), 'sword');
   assert.equal(g.run('FLOOR_THEMES.length'), 6);
   const names = g.run('FLOOR_THEMES.map(t=>t.name).join("|")');
   assert.equal(names, 'Opening|Early Game|Midgame|Middle Gambit|Climax|Endgame');
@@ -230,7 +231,8 @@ test('R19 R25 every floor map stays walkable from the start position', () => {
 });
 
 test('R26 the floor name is shown when entering a floor', () => {
-  const g = startRun(loadGame({ seed: 26 }), 'sword');
+  // Amended in Round 4 (R59, R62): checked in the chess theme; R59 checks the fantasy floor names.
+  const g = startRun(loadGame({ seed: 26, storage: { slaughtermate_look: 'chess' } }), 'sword');
   for (let f = 1; f <= 6; f++) {
     onFloor(g, f);
     const name = g.run(`FLOOR_THEMES[${f - 1}].name`);

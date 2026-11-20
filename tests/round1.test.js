@@ -10,7 +10,8 @@ const lum = hex => {
 };
 
 test('R1 player is a white pawn, enemies are black pieces, bosses are checkered', () => {
-  const g = startRun(loadGame({ seed: 1 }), 'sword');
+  // Amended in Round 4 (R55, R62): this is the chess theme's look; the fantasy default is tested by R56-R58.
+  const g = startRun(loadGame({ seed: 1, storage: { slaughtermate_look: 'chess' } }), 'sword');
   clearBoard(g);
   assert.equal(g.run('FORMS[P.form]'), 'pawn');
   g.run("spawnEnemy('knight',P.x+120,P.y);spawnBoss();G.boss.x=P.x-250;G.boss.y=P.y;cam.x=P.x-VW/2;cam.y=P.y-VH/2;");
@@ -148,14 +149,15 @@ test('R8 spell tiers scale from small to massive', () => {
 
 test('R9 the player can equip 3 spells and each tier has at least 5 spells', () => {
   const g = startRun(loadGame({ seed: 9 }), 'sword');
-  assert.equal(g.run('P.spells.length'), 3);
+  // Amended in Round 4 (R76): 5 spell slots instead of 3.
+  assert.equal(g.run('P.spells.length'), 5);
   for (let t = 1; t <= 5; t++) assert.ok(g.run(`SPELLS.filter(s=>s.tier===${t}).length`) >= 5);
-  g.run("P.spells=[null,null,null];var ids=SPELLS.filter(s=>s.tier===1).map(s=>s.id);var done=0;");
-  g.run('equipSpell(ids[0],()=>done++);equipSpell(ids[1],()=>done++);equipSpell(ids[2],()=>done++);');
-  assert.equal(g.run('P.spells.filter(Boolean).length'), 3);
-  assert.equal(g.run('done'), 3);
-  g.run('equipSpell(ids[3],()=>done++);');
-  assert.equal(g.run('done'), 3, 'a 4th spell asks to replace instead of adding a slot');
+  g.run("P.spells=[null,null,null,null,null];var ids=SPELLS.filter(s=>s.tier===1).map(s=>s.id);var done=0;");
+  g.run('for(let i=0;i<5;i++)equipSpell(ids[i],()=>done++);');
+  assert.equal(g.run('P.spells.filter(Boolean).length'), 5);
+  assert.equal(g.run('done'), 5);
+  g.run('equipSpell(ids[5],()=>done++);');
+  assert.equal(g.run('done'), 5, 'a 6th spell asks to replace instead of adding a slot');
   assert.equal(g.run("$('replace').classList.contains('hidden')"), false);
 });
 

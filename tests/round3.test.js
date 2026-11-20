@@ -8,9 +8,10 @@ const rgb = hex => { const n = parseInt(String(hex).slice(1), 16); return [n >> 
 const ELEMENTS = ['fire', 'ice', 'lightning', 'earth', 'wind', 'nature', 'poison', 'arcane', 'light', 'sun', 'moon', 'darkness', 'tech', 'hyper', 'mind'];
 // R36-R45: the particle each element uses instead of plain sparkles, and its area-effect style.
 const EXPECT_PART = { fire: 'flame', sun: 'crescent', ice: 'flake', poison: 'skull', lightning: 'zap', arcane: 'shape', hyper: 'piece',
-  tech: 'pixel', mind: 'circle', moon: 'star', light: 'streak', darkness: 'wisp', nature: 'leaf', wind: 'cloud', earth: 'debris' };
+  tech: 'pixel', mind: 'circle', moon: 'star', light: 'streak', darkness: 'wisp', nature: 'leaf', wind: 'cloud', earth: 'rock' };
+// Amended in Round 4 (R66): earth particles are rocks (and cracks) and its area is solid brown.
 const EXPECT_AREA = { fire: 'fire', sun: 'domain', ice: 'ice', poison: 'puddle', lightning: 'storm', arcane: 'portal', tech: 'grid',
-  mind: 'warp', moon: 'night', darkness: 'void', nature: 'vines', wind: 'fog', hyper: 'plain', light: 'plain', earth: 'plain' };
+  mind: 'warp', moon: 'night', darkness: 'void', nature: 'vines', wind: 'fog', hyper: 'plain', light: 'plain', earth: 'solid' };
 
 function cast(g, id, x, y) {
   g.run(`P.spells[0]={id:'${id}',lvl:1,cd:0,cdMax:1};`);
@@ -223,6 +224,8 @@ test('R47 the advance button also closes the shop and the shop never opens on it
 
 test('R48 enemies drop chess-piece fragment shards that pay for the shop', () => {
   const g = arena(48);
+  g.run("setLook('chess')");   // Amended in Round 4 (R62): the chess look is now the optional chess theme
+
   g.run('for(let i=0;i<60;i++){const e=spawnEnemy("pawn",P.x+300,P.y);hitEnemy(e,1e9);}');
   assert.ok(g.run("G.pickups.some(p=>p.k==='frag')"), 'fragments drop');
   assert.ok(g.run("G.pickups.every(p=>p.k==='xp'||p.k==='frag')"), 'no gold coins');
@@ -238,6 +241,8 @@ test('R48 enemies drop chess-piece fragment shards that pay for the shop', () =>
 
 test('R48 the shop prices everything in fragments', () => {
   const g = arena(481);
+  g.run("setLook('chess')");   // Amended in Round 4 (R62): the chess look is now the optional chess theme
+
   g.run('P.gold=5000;openShop();');
   const html = g.elements('shop').innerHTML + g.elements('shSpells').children.map(c => c.innerHTML).join('') +
     g.elements('shItems').children.map(c => c.innerHTML).join('');
@@ -257,11 +262,11 @@ test('R49 the menu logbook lists every spell, locked until obtained', () => {
   assert.ok(!g.elements('logbook').classList.contains('hidden'), 'logbook opens');
   const html = g.elements('logbook').innerHTML;
   const total = g.run('ALL_SPELLS.length');
-  assert.equal(total, 78, '75 tiered spells plus 3 Grandmaster spells');
+  assert.equal(total, 84, '75 tiered spells plus 9 Grandmaster spells');   // Amended in Round 4 (R70-R75): was 78
   assert.equal((html.match(/class="logent/g) || []).length, total, 'one entry per obtainable spell');
   assert.equal((html.match(/logent locked/g) || []).length, total, 'all locked at first');
   assert.doesNotMatch(html, /Supernova|Game of Despair/, 'locked spells hide their names');
-  assert.match(html, /0 \/ 78/);
+  assert.match(html, /0 \/ 84/);
   g.elements('logClose').onclick();
   assert.ok(g.elements('logbook').classList.contains('hidden'));
 });
@@ -277,8 +282,9 @@ test('R49 obtaining a spell in a run unlocks it in the logbook across runs', () 
   g2.run('showMenu();showLogbook();');
   const html = g2.elements('logbook').innerHTML;
   assert.match(html, /Supernova/);
-  assert.match(html, new RegExp(`${saved.length} / 78`));
-  assert.equal((html.match(/logent locked/g) || []).length, 78 - saved.length);
+  // Amended in Round 4 (R70-R75): 84 spells instead of 78.
+  assert.match(html, new RegExp(`${saved.length} / 84`));
+  assert.equal((html.match(/logent locked/g) || []).length, 84 - saved.length);
 });
 
 /* ---------- R50 crowns ---------- */
@@ -306,7 +312,8 @@ test('R50 winning a run crowns the weapon, sized by difficulty', () => {
 test('R51 the Grandmaster tier ranks above tier 5', () => {
   const g = loadGame();
   const gm = JSON.parse(g.run('JSON.stringify(GM_SPELLS)'));
-  assert.deepEqual(gm.map(s => s.id).sort(), ['despair', 'inversion', 'seal']);
+  // Amended in Round 4 (R70-R75): six more Grandmaster spells.
+  assert.deepEqual(gm.map(s => s.id).sort(), ['calamity', 'despair', 'doom', 'excalibur', 'hellfire', 'inversion', 'nightfog', 'seal', 'slumber']);
   assert.ok(gm.every(s => s.tier === 6 && s.r >= 500 && s.cd >= 30), 'tier 6, huge area, long cooldown');
   const t5max = g.run('Math.max(...SPELLS.filter(s=>s.tier===5).map(s=>s.dmg||0))');
   for (const id of ['despair', 'seal']) assert.ok(gm.find(s => s.id === id).dmg > t5max * 1.5, id + ' outclasses tier 5');
@@ -327,7 +334,7 @@ test('R51 Grandmaster spells are rare rewards from floor 4 and every one is offe
   for (let i = 0; i < 600; i++) for (const c of g.run('makeCards()')) {
     if (c.type === 'gm') { gmCards++; seen.add(c.id); } else if (c.type === 'spell') spellCards++;
   }
-  assert.equal(seen.size, 3, 'all three are offered');
+  assert.equal(seen.size, 9, 'all nine are offered');   // Amended in Round 4 (R70-R75): was 3
   assert.ok(gmCards < spellCards / 5, 'Grandmaster cards stay rare');
   g.run('G.bags[6]=[];');
   assert.equal(new Set([0, 1, 2].map(() => g.run('drawGM(new Set())'))).size, 3, 'shuffle bag gives each before repeats');
@@ -339,7 +346,7 @@ test('R51 the cart sells one Grandmaster spell from floor 4 on', () => {
   assert.equal(g.run('G.shop.gm'), null, 'none before floor 4');
   g.run('G.floor=4;openShop();');
   const id = g.run('G.shop.gm');
-  assert.ok(['despair', 'inversion', 'seal'].includes(id));
+  assert.ok(g.run('GM_SPELLS.map(s=>s.id)').includes(id));   // Amended in Round 4 (R70-R75): any of the 9
   const box = g.elements('shGm').children;
   assert.equal(box.length, 1);
   assert.match(box[0].innerHTML, /Grandmaster/);
@@ -359,7 +366,8 @@ test('R52 Game of Despair: chess phantoms gather into an orb that bursts and wea
   g.step(0.6);
   const R = g.run("G.rituals.find(r=>r.kind==='despair')");
   assert.ok(R, 'domain is cast');
-  assert.equal(g.run("G.rituals[0].phantoms.map(p=>p.type).sort().join()"), 'bishop,king,knight,pawn,queen,rook', 'a phantom of each piece');
+  // Amended in Round 4 (R67): a second ring of phantoms, so each piece appears in each ring.
+  assert.equal(g.run("[...new Set(G.rituals[0].phantoms.map(p=>p.type))].sort().join()"), 'bishop,king,knight,pawn,queen,rook', 'a phantom of each piece');
   assert.equal(g.run('A.hp'), g.run('A.maxHp'), 'power gathers before the burst');
   g.run('cam.x=P.x-VW/2;cam.y=P.y-VH/2;render();');
   g.step(3.5);
@@ -400,16 +408,17 @@ test('R53 Mental Inversion: controlled enemies fight their own side and victims 
   assert.ok(g.run('A.charmT<=0'), 'mind control wears off');
 });
 
-test('R54 Grand Seal: chains and 5 portals pull enemies in, then it explodes and freezes them', () => {
+// Amended in Round 4 (R69): the 5 portals became 4 glyphs chained to one central portal; R69 checks the new design.
+test('R54 Grand Seal: chains and portals pull enemies in, then it explodes and freezes them', () => {
   const g = arena(54);
   const cx = g.run('P.x+400'), cy = g.run('P.y');
   g.run(`var I=[];for(let k=0;k<6;k++){const a=k/6*TAU,e=spawnEnemy('pawn',${cx}+Math.cos(a)*320,${cy}+Math.sin(a)*320);e.hp=e.maxHp=1e7;e.dmg=0;e.speed=0;I.push(e);}
     var O=spawnEnemy('pawn',${cx + 1300},${cy});O.hp=O.maxHp=1e7;O.speed=0;`);
   cast(g, 'seal', cx, cy);
   g.step(0.5);
-  assert.equal(g.run("G.rituals.find(r=>r.kind==='seal').portals.length"), 5, 'five portals');
-  assert.ok(g.run("G.rituals[0].chains>=12"), 'chains ring the area');
-  const near = () => g.run('I.reduce((a,e)=>a+Math.min(...G.rituals[0].portals.map(p=>Math.hypot(e.x-p.x,e.y-p.y))),0)');
+  assert.ok(g.run("G.rituals.find(r=>r.kind==='seal').portal"), 'a portal');
+  assert.ok(g.run("G.rituals[0].links.length>=12"), 'many chains');
+  const near = () => g.run('I.reduce((a,e)=>a+Math.hypot(e.x-G.rituals[0].portal.x,e.y-G.rituals[0].portal.y),0)');
   const d0 = near();
   g.step(1);
   assert.ok(near() < d0 * 0.8, 'portals pull enemies in');
