@@ -91,8 +91,13 @@ test('R5 six bosses, one per piece type, each ends a floor and must be killed', 
   assert.equal(g.run('G.state'), 'play');
   g.run('hitEnemy(G.boss,1e9);');
   assert.equal(g.run('G.phase'), 'cleared');
+  // Amended in Round 3 (R46, R47): the floor now ends at the merchant cart, which opens the shop
+  // when touched, not with an automatic shop screen.
   g.step(4);
-  assert.equal(g.run('G.state'), 'shop', 'floor ends after the boss dies');
+  assert.ok(g.run('G.cart!==null'), 'floor ends after the boss dies: the merchant cart arrives');
+  g.run('P.x=G.cart.x;P.y=G.cart.y;');
+  g.step(0.1);
+  assert.equal(g.run('G.state'), 'shop', 'touching the cart opens the shop');
 });
 
 test('R6 the player is promoted through the other five pieces', () => {
