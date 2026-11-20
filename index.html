@@ -145,8 +145,15 @@ const DIFFICULTY={
  hard:{name:'Hard',hp:1.4,dmg:1.35,proj:1.2,score:1.5},
 };
 const diff=()=>DIFFICULTY[G.difficulty]||DIFFICULTY.normal;
-const TIER_COL=['','#9aa0a6','#4caf50','#2f80ed','#9b51e0','#f2c94c'];
-const EL_COL={fire:'#ff6a2b',ice:'#7fd8ff',lightning:'#ffe14d',earth:'#c09060',wind:'#b9f5d0',nature:'#5fd068',poison:'#9be04a',arcane:'#c77dff',light:'#fff3a0',sun:'#ffb21e',moon:'#c9d6ff',darkness:'#8a3fd0',tech:'#3ef0e0',hyper:'#ff3ec8',mind:'#ff7799'};
+const TIER_COL=['','#9aa0a6','#4caf50','#2f80ed','#9b51e0','#f2c94c','#ff4fd8'];
+const TIER_NAME=['','Tier 1','Tier 2','Tier 3','Tier 4','Tier 5','Grandmaster'];
+// Sun is a deeper red from Round 3 (R36) so it can't be mistaken for fire.
+const EL_COL={fire:'#ff6a2b',ice:'#7fd8ff',lightning:'#ffe14d',earth:'#c09060',wind:'#b9f5d0',nature:'#5fd068',poison:'#9be04a',arcane:'#c77dff',light:'#fff3a0',sun:'#c8231e',moon:'#c9d6ff',darkness:'#8a3fd0',tech:'#3ef0e0',hyper:'#ff3ec8',mind:'#ff7799',grandmaster:'#ff4fd8'};
+// R36-R45: each element's own particle shape (replacing plain coloured sparkles) and area-effect style.
+const EL_PART={fire:'flame',sun:'crescent',ice:'flake',poison:'skull',lightning:'zap',arcane:'shape',hyper:'piece',tech:'pixel',
+ mind:'circle',moon:'star',light:'streak',darkness:'wisp',nature:'leaf',wind:'cloud',earth:'debris'};
+const EL_AREA={fire:'fire',sun:'domain',ice:'ice',poison:'puddle',lightning:'storm',arcane:'portal',tech:'grid',mind:'warp',
+ moon:'night',darkness:'void',nature:'vines',wind:'fog',hyper:'plain',light:'plain',earth:'plain'};
 const FORMS=['pawn','knight','bishop','rook','queen','king'];
 const FORM_NAMES=['Pawn','Knight','Bishop','Rook','Queen','King'];
 const FORM_BONUS=[null,
@@ -502,16 +509,56 @@ function particle(shape,x,y,c,o){
 function sparkle(x,y,n,c,sp,spread){sp=sp||1;spread=spread||0;for(let i=0;i<n;i++){const a=rand(0,TAU),rr=spread*Math.sqrt(Math.random());
  particle('spark',x+Math.cos(a)*rr,y+Math.sin(a)*rr,Math.random()<0.3?'#ffffff':c,{v:rand(20,150)*sp,sz:rand(3,7)*Math.min(2,0.8+sp*0.25)});}}
 function debris(x,y,n,c,sp){sp=sp||1;for(let i=0;i<n;i++)particle('debris',x,y,c,{v:rand(80,260)*sp,vy:-rand(60,180)*sp,g:520,dur:rand(0.5,0.9),sz:rand(3,7)});}
-// Element-flavoured detail particles: fire and sun throw embers, ice and moon shards, earth debris.
-const EL_SHAPE={fire:'ember',sun:'ember',ice:'shard',moon:'shard',earth:'debris'};
-function elementFx(el,x,y,n,sp,spread){
- const c=EL_COL[el]||'#fff',sh=EL_SHAPE[el];
- sparkle(x,y,n,c,sp,spread);
- if(sh==='debris')debris(x,y,Math.ceil(n/2),c,sp);
- else if(sh)for(let i=0;i<Math.ceil(n/2);i++){const a=rand(0,TAU),rr=(spread||0)*Math.sqrt(Math.random());
-  particle(sh,x+Math.cos(a)*rr,y+Math.sin(a)*rr,c,{v:rand(20,120)*sp,vy:sh==='ember'?-60:0});}
+// R36-R45: one particle in the element's own shape (flames, crescents, snowflakes, skulls...).
+// Each shape gets the motion and size that suits it; drawn by PART_DRAW in drawParticles().
+function elPart(el,x,y,o){
+ if(G.parts.length>=PART_CAP)return;o=o||{};
+ const sh=EL_PART[el]||'spark',c=EL_COL[el]||'#fff',sp=o.sp||1,q={a:o.a,v:(o.v??rand(20,130))*sp};
+ switch(sh){
+  case 'flame':q.vy=-rand(50,110);q.sz=rand(3,7);q.dur=rand(0.35,0.7);break;
+  case 'crescent':q.sz=Math.random()<0.5?rand(3,6):rand(9,16);q.dur=rand(0.5,0.9);break;   // large and small
+  case 'flake':q.sz=rand(4,7.5);q.dur=rand(0.5,0.9);break;
+  case 'skull':q.sz=rand(5,8);q.vy=-rand(15,40);q.v*=0.4;q.dur=rand(0.6,1);break;
+  case 'zap':q.sz=rand(5,10);q.dur=rand(0.18,0.32);break;
+  case 'shape':q.sz=rand(9,16);q.dur=rand(0.5,0.9);break;                                   // arcane: biggest particles
+  case 'piece':q.sz=rand(6,9.5);q.dur=rand(0.5,0.85);break;
+  case 'pixel':q.sz=rand(3,5);q.dur=rand(0.35,0.7);break;
+  case 'circle':q.sz=rand(7,13);q.v*=0.5;q.dur=rand(0.5,0.8);break;
+  case 'star':q.sz=rand(3,6.5);q.dur=rand(0.5,0.9);break;
+  case 'streak':q.sz=rand(1.5,2.6);q.v=(o.v??rand(120,300))*sp;q.dur=rand(0.22,0.4);break;
+  case 'wisp':q.sz=rand(5,8);q.vy=-rand(25,55);q.v*=0.5;q.dur=rand(0.6,1);break;
+  case 'leaf':q.sz=rand(4,7);q.g=70;q.dur=rand(0.6,1);break;
+  case 'cloud':q.sz=rand(6,11);q.v*=0.35;q.dur=rand(0.7,1.1);break;
+  case 'debris':q.v=(o.v??rand(80,260))*sp;q.vy=-rand(60,180)*sp;q.g=520;q.sz=rand(3,7);q.dur=rand(0.5,0.9);break;
+ }
+ if(o.vy!==undefined)q.vy=o.vy;if(o.dur)q.dur=o.dur;if(o.sz)q.sz=o.sz;
+ particle(sh,x,y,c,q);
+ const p=G.parts[G.parts.length-1];if(!p||p.shape!==sh)return;
+ if(sh==='crescent')p.jag=randi(5,7);
+ else if(sh==='shape')p.n=pick([3,4,5,6,8]);                     // triangles, squares, pentagons, hexagons, stars
+ else if(sh==='piece')p.piece=pick(FORMS);
+ else if(sh==='streak'){p.len=rand(16,38)*(o.sp||1);p.spin=0;}
+ else if(sh==='pixel'){p.x=Math.round(p.x/4)*4;p.y=Math.round(p.y/4)*4;p.spin=0;p.rot=0;}
+ else if(sh==='zap')p.spin=0;
 }
-// Ring of sparkles along a circle's edge (novas, shockwaves).
+// White glints stay common to all spells (the only plain sparkles left on spells after Round 3).
+function glint(x,y,n,sp,spread){sp=sp||1;spread=spread||0;for(let i=0;i<n;i++){const a=rand(0,TAU),rr=spread*Math.sqrt(Math.random());
+ particle('spark',x+Math.cos(a)*rr,y+Math.sin(a)*rr,'#ffffff',{v:rand(20,120)*sp,sz:rand(2.5,5)});}}
+// Element burst: n element particles scattered over `spread`, plus a few white glints. Light also
+// throws extra streak lines (R43).
+function elementFx(el,x,y,n,sp,spread){
+ sp=sp||1;spread=spread||0;
+ for(let i=0;i<n;i++){const a=rand(0,TAU),rr=spread*Math.sqrt(Math.random());elPart(el,x+Math.cos(a)*rr,y+Math.sin(a)*rr,{sp});}
+ if(el==='light')for(let i=0;i<n;i++){const a=rand(0,TAU),rr=spread*Math.sqrt(Math.random());elPart('light',x+Math.cos(a)*rr,y+Math.sin(a)*rr,{sp:sp*1.3});}
+ glint(x,y,Math.ceil(n/4),sp,spread);
+}
+// Element particles around a circle's edge (novas, shockwaves) and along a line (beams).
+function elRing(el,x,y,r,n){for(let i=0;i<n;i++){const a=i/n*TAU+rand(-0.1,0.1);if(i%4===3)particle('spark',x+Math.cos(a)*r,y+Math.sin(a)*r,'#ffffff',{a,v:rand(30,110),sz:rand(3,5)});
+ else elPart(el,x+Math.cos(a)*r,y+Math.sin(a)*r,{a,v:rand(30,110)});}}
+function elLine(el,ax,ay,bx,by,n,w){const l=Math.hypot(bx-ax,by-ay)||1,a=Math.atan2(by-ay,bx-ax);
+ for(let i=0;i<n;i++){const f=Math.random(),o=rand(-1,1)*(w||10)/2,x=ax+(bx-ax)*f-(by-ay)/l*o,y=ay+(by-ay)*f+(bx-ax)/l*o;
+  if(i%4===3)particle('spark',x,y,'#ffffff',{v:rand(20,90)});else elPart(el,x,y,el==='light'?{a:a+rand(-0.2,0.2)}:{v:rand(20,90)});}}
+// Ring of sparkles along a circle's edge (enemy attacks).
 function sparkRing(x,y,r,n,c){for(let i=0;i<n;i++){const a=i/n*TAU+rand(-0.1,0.1);particle('spark',x+Math.cos(a)*r,y+Math.sin(a)*r,i%3?c:'#ffffff',{a,v:rand(30,110),sz:rand(3,6)});}}
 // Sparkles scattered along a line (beams, telegraphed lines).
 function sparkLine(ax,ay,bx,by,n,c,w){for(let i=0;i<n;i++){const f=Math.random(),o=rand(-1,1)*(w||10)/2,l=Math.hypot(bx-ax,by-ay)||1;
@@ -527,7 +574,7 @@ function hitEnemy(e,dmg,o){
  if(e.weakT>0)dmg*=1.15;                                  // weakened by a Mind spell (R34)
  const dealt=Math.min(dmg,Math.max(0,e.hp));G.dealt+=dealt;
  e.hp-=dmg;if(!o.tick)e.flash=0.1;
- if(o.dot)applyDot(e,o.dot[0],o.dot[1],o.dotKey||'dot',o.dotCol);
+ if(o.dot)applyDot(e,o.dot[0],o.dot[1],o.dotKey||'dot',o.dotCol,o.dotEl);
  if(o.weak)e.weakT=Math.max(e.weakT,o.weak);
  if(e.txtCd<=0||crit){floatText(e.x,e.y-e.s*2.4-e.z,Math.round(dmg),crit?'#ffd23f':(e.boss?'#ffb0b0':'#ffffff'),crit);e.txtCd=0.18;}
  if(!e.boss&&!e.static){
@@ -539,16 +586,16 @@ function hitEnemy(e,dmg,o){
  return dealt;
 }
 // Damage over time (Tome spirits, Mind spells, burns). Same key refreshes instead of stacking.
-function applyDot(e,dps,dur,key,col){
+function applyDot(e,dps,dur,key,col,el){
  if(e.dead||!e.dots)return;
  const d=e.dots.find(x=>x.key===key);
  if(d){d.dps=Math.max(d.dps,dps);d.t=Math.max(d.t,dur);}
- else e.dots.push({key,dps,t:dur,acc:0,col:col||'#ff7799'});
+ else e.dots.push({key,dps,t:dur,acc:0,col:col||'#ff7799',el});
 }
 function tickDots(e,dt){
  for(const d of e.dots){
   const step=Math.min(dt,Math.max(0,d.t));d.t-=dt;d.acc+=step;
-  if(d.acc>=0.25||d.t<=0){const dmg=d.dps*d.acc;d.acc=0;if(dmg>0){hitEnemy(e,dmg,{tick:true});if(onScreen(e.x,e.y,40))particle('spark',e.x+rand(-e.r,e.r),e.y-e.s*rand(0.5,2),d.col,{v:rand(10,50),vy:-40,sz:rand(2,4)});}}
+  if(d.acc>=0.25||d.t<=0){const dmg=d.dps*d.acc;d.acc=0;if(dmg>0){hitEnemy(e,dmg,{tick:true});if(onScreen(e.x,e.y,40)){const px=e.x+rand(-e.r,e.r),py=e.y-e.s*rand(0.5,2);if(d.el)elPart(d.el,px,py,{v:rand(10,50),vy:-40});else particle('spark',px,py,d.col,{v:rand(10,50),vy:-40,sz:rand(2,4)});}}}
   if(e.dead)return;
  }
  e.dots=e.dots.filter(d=>d.t>0);
@@ -666,13 +713,13 @@ function dash(){
 
 /* ================= SPELLS ================= */
 function nearestEnemy(x,y,maxd,ex){let best=null,bd=maxd*maxd;for(const e of G.enemies){if(e.dead||(ex&&ex.has(e)))continue;const q=dist2(x,y,e.x,e.y);if(q<bd){bd=q;best=e;}}return best;}
-function chain(sx,sy,tx,ty,count,dmg,jump,col,o){
+function chain(sx,sy,tx,ty,count,dmg,jump,col,o,el){
  const hit=new Set();let cur=nearestEnemy(tx,ty,260)||nearestEnemy(sx,sy,500),px=sx,py=sy-15;
  for(let i=0;i<count&&cur;i++){
   hit.add(cur);
   const pts=[[px,py]],ex=cur.x,ey=cur.y-cur.s;
   for(let k=1;k<6;k++){const f=k/6;pts.push([px+(ex-px)*f+rand(-12,12),py+(ey-py)*f+rand(-12,12)]);}
-  pts.push([ex,ey]);addFx({kind:'bolt',pts,color:col,dur:0.25});sparkle(ex,ey,4,col,0.8);
+  pts.push([ex,ey]);addFx({kind:'bolt',pts,color:col,dur:0.25});if(el)elementFx(el,ex,ey,4,0.8);else sparkle(ex,ey,4,col,0.8);
   px=cur.x;py=cur.y-cur.s;hitEnemy(cur,dmg,o||{});
   cur=nearestEnemy(px,cur.y,jump,hit);
  }
@@ -690,7 +737,7 @@ function castSpell(i){
 function updateCasts(dt){
  for(const c of G.casts){c.t-=dt;const col=EL_COL[SPELL_BY_ID[c.id].el];
   // energy gathers into the caster while winding up
-  if(Math.random()<0.8){const a=rand(0,TAU),r=rand(50,90);particle('spark',P.x+Math.cos(a)*r,P.y-15+Math.sin(a)*r,col,{a:a+Math.PI,v:r*3,dur:0.3});}
+  if(Math.random()<0.8){const a=rand(0,TAU),r=rand(50,90);elPart(SPELL_BY_ID[c.id].el,P.x+Math.cos(a)*r,P.y-15+Math.sin(a)*r,{a:a+Math.PI,v:r*3,dur:0.3});}
   if(c.t<=0)fireSpell(SPELL_BY_ID[c.id],c.lvl);}
  G.casts=G.casts.filter(c=>c.t>0);
 }
@@ -699,7 +746,7 @@ function fireSpell(d,lvl){
  const m=mouseWorld(),dx=m.x-P.x,dy=m.y-P.y,dd=Math.hypot(dx,dy)||1,ang=Math.atan2(dy,dx);
  let tx=m.x,ty=m.y;if(dd>650){tx=P.x+dx/dd*650;ty=P.y+dy/dd*650;}
  // shared hit options: damage over time, weaken, slow, stun
- const o={dot:d.dot?[d.dot[0]*lv*P.spellMult,d.dot[1]]:null,dotKey:d.id,dotCol:col,weak:d.weak||0,slow:d.slow||0,stun:d.stun||0};
+ const o={dot:d.dot?[d.dot[0]*lv*P.spellMult,d.dot[1]]:null,dotKey:d.id,dotCol:col,dotEl:d.el,weak:d.weak||0,slow:d.slow||0,stun:d.stun||0};
  const big=d.tier>=3;
  // cast flourish at the caster's hand (R17): more sparkles for higher tiers
  elementFx(d.el,P.x+Math.cos(ang)*18,P.y-18+Math.sin(ang)*18,3+d.tier*3,0.8+d.tier*0.15);
@@ -710,35 +757,35 @@ function fireSpell(d,lvl){
     G.pproj.push({x:P.x,y:P.y,vx:Math.cos(a)*d.speed,vy:Math.sin(a)*d.speed,r:d.r?11:8,dmg,life:1.3,pierce:d.pierce||0,hit:new Set(),explode:d.r||0,knock:15,
      kind:'spell',color:col,el:d.el,homing:!!d.homing,spd:d.speed,o});}break;}
   case 'nova':damageCircle(P.x,P.y,d.r,dmg,Object.assign({},o,{knock:d.knock||0}));
-   addFx({kind:'flash',x:P.x,y:P.y,r:d.r,color:col,dur:0.35});addFx({kind:'ring',x:P.x,y:P.y,r0:10,r:d.r,color:col,w:d.tier>=4?16:6,dur:0.5});
+   addFx({kind:'area',el:d.el,x:P.x,y:P.y,r:d.r,color:col,dur:0.5});addFx({kind:'ring',x:P.x,y:P.y,r0:10,r:d.r,color:col,w:d.tier>=4?16:6,dur:0.5});
    if(big)addFx({kind:'ring',x:P.x,y:P.y,r0:10,r:d.r*0.7,color:'#ffffff',w:4,dur:0.4});
-   burst(P.x,P.y,10+d.tier*10,col,d.r/90);sparkRing(P.x,P.y,d.r*0.85,8+d.tier*8,col);elementFx(d.el,P.x,P.y,4+d.tier*4,d.r/120,d.r*0.5);
+   burst(P.x,P.y,10+d.tier*10,col,d.r/90);elRing(d.el,P.x,P.y,d.r*0.85,8+d.tier*8);elementFx(d.el,P.x,P.y,4+d.tier*4,d.r/120,d.r*0.5);
    if(d.heal){const h=P.maxHp*d.heal*lv;P.hp=Math.min(P.maxHp,P.hp+h);floatText(P.x,P.y-55,'+'+Math.round(h),'#5fd068',true);}
    if(d.tier>=3)G.shake=Math.max(G.shake,d.tier*3.5);break;
   case 'zone':G.zones.push({x:tx,y:ty,r:d.r,dps:dmg,t:d.dur,dur:d.dur,tick:0,color:col,el:d.el,tier:d.tier,slow:d.slow||0,pull:d.pull||0,o});
-   sparkRing(tx,ty,d.r,6+d.tier*4,col);break;
+   elRing(d.el,tx,ty,d.r,6+d.tier*4);break;
   case 'rain':for(let k=0;k<d.count;k++){const a=rand(0,TAU),rr=Math.sqrt(Math.random())*d.spread;
    G.pstrikes.push({x:tx+Math.cos(a)*rr,y:ty+Math.sin(a)*rr,r:d.r,dmg,t:0,delay:0.3+k/d.count*d.dur,color:col,el:d.el,big:!!d.bigRain,o});}break;
   case 'meteor':G.pstrikes.push({x:tx,y:ty,r:d.r,dmg,t:0,delay:d.delay,color:col,el:d.el,big:true,knock:40,o});break;
   case 'collapse':G.zones.push({x:tx,y:ty,r:d.r,dps:dmg*0.05,t:d.delay,dur:d.delay,tick:0,color:col,el:d.el,tier:d.tier,pull:d.pull,swirl:true,o});
    G.pstrikes.push({x:tx,y:ty,r:d.r,dmg,t:0,delay:d.delay,color:col,el:d.el,big:true,knock:60,o});break;
-  case 'chain':chain(P.x,P.y,tx,ty,d.count,dmg,d.jump,col,o);break;
+  case 'chain':chain(P.x,P.y,tx,ty,d.count,dmg,d.jump,col,o,d.el);break;
   case 'beam':
-   if(d.dur>0)G.beams.push({len:d.len,w:d.w,dps:dmg,t:d.dur,dur:d.dur,tick:0,color:col,o});
+   if(d.dur>0)G.beams.push({len:d.len,w:d.w,dps:dmg,t:d.dur,dur:d.dur,tick:0,color:col,el:d.el,o});
    else{const bx=P.x+Math.cos(ang)*d.len,by=P.y+Math.sin(ang)*d.len;damageLine(P.x,P.y,bx,by,d.w,dmg,Object.assign({},o,{knock:20,fx:P.x,fy:P.y}));
     addFx({kind:'beam',ax:P.x,ay:P.y-14,bx,by:by-14,w:d.w,color:col,dur:0.35});addFx({kind:'beam',ax:P.x,ay:P.y-14,bx,by:by-14,w:d.w*0.3,color:'#ffffff',dur:0.25});
-    sparkLine(P.x,P.y-14,bx,by-14,6+d.tier*6,col,d.w);}
+    elLine(d.el,P.x,P.y-14,bx,by-14,6+d.tier*6,d.w);}
    break;
-  case 'orbit':G.orbs.push({n:d.count,r:d.r,dmg,t:d.dur,a:0,tick:0,color:col,o});sparkRing(P.x,P.y-14,d.r,d.count*3,col);break;
+  case 'orbit':G.orbs.push({n:d.count,r:d.r,dmg,t:d.dur,a:0,tick:0,color:col,el:d.el,o});elRing(d.el,P.x,P.y-14,d.r,d.count*3);break;
   case 'heal':{const h=P.maxHp*d.amt*lv;P.hp=Math.min(P.maxHp,P.hp+h);floatText(P.x,P.y-55,'+'+Math.round(h),'#5fd068',true);
    addFx({kind:'ring',x:P.x,y:P.y,r0:60,r:10,color:col,w:5,dur:0.5});burst(P.x,P.y-15,14,col);
-   for(let k=0;k<14;k++)particle('spark',P.x+rand(-22,22),P.y-rand(0,40),k%3?col:'#ffffff',{a:-Math.PI/2+rand(-0.4,0.4),v:rand(40,110),dur:0.8});break;}
-  case 'shield':P.shield=P.maxHp*d.amt*lv;P.shieldT=d.dur;addFx({kind:'ring',x:P.x,y:P.y,r0:10,r:60,color:col,w:6,dur:0.4});sparkRing(P.x,P.y-15,40,14,col);break;
+   for(let k=0;k<14;k++)elPart(d.el,P.x+rand(-22,22),P.y-rand(0,40),{a:-Math.PI/2+rand(-0.4,0.4),v:rand(40,110),dur:0.8});glint(P.x,P.y-15,3);break;}
+  case 'shield':P.shield=P.maxHp*d.amt*lv;P.shieldT=d.dur;addFx({kind:'ring',x:P.x,y:P.y,r0:10,r:60,color:col,w:6,dur:0.4});elRing(d.el,P.x,P.y-15,40,14);break;
   case 'psywave':{   // Mind: telekinetic waves at the cursor (tier 1 inspired by "Psychic")
    damageCircle(tx,ty,d.r,dmg,o);
    for(let k=0;k<3;k++)G.fx.push({kind:'ring',x:tx,y:ty,r0:d.r*0.2,r:d.r*(0.8+0.15*k),color:k===1?'#ffffff':col,w:4+d.tier,dur:0.45,t:-0.1*k});
-   addFx({kind:'glyph',x:tx,y:ty,r:d.r*0.7,color:col,dur:0.6,eye:true});addFx({kind:'flash',x:tx,y:ty,r:d.r,color:col,dur:0.3});
-   sparkle(tx,ty,6+d.tier*5,col,0.8,d.r*0.6);if(d.tier>=3)G.shake=Math.max(G.shake,d.tier*2);break;}
+   addFx({kind:'glyph',x:tx,y:ty,r:d.r*0.7,color:col,dur:0.6,eye:true});addFx({kind:'area',el:d.el,x:tx,y:ty,r:d.r,color:col,dur:0.45});
+   elementFx(d.el,tx,ty,6+d.tier*5,0.8,d.r*0.6);if(d.tier>=3)G.shake=Math.max(G.shake,d.tier*2);break;}
   case 'psystrike':   // Mind tier 5 (inspired by "Psystrike"): three expanding psychic shockwaves
    for(let k=0;k<3;k++)G.pstrikes.push({x:P.x,y:P.y,r:d.r*(0.55+0.225*k),dmg:dmg/3,t:0,delay:0.05+0.22*k,color:col,el:d.el,wave:true,knock:40,o});
    addFx({kind:'glyph',x:P.x,y:P.y,r:d.r*0.4,color:col,dur:0.9,eye:true});G.shake=Math.max(G.shake,14);break;
@@ -966,15 +1013,16 @@ function update(dt){
    if(dist2(p.x,p.y,e.x,e.y)<rr*rr){
     if(p.explode){explodeProj(p);break;}
     p.hit.add(e);hitEnemy(e,p.dmg,Object.assign({},p.o,{slow:p.slow||(p.o&&p.o.slow)||0,knock:p.knock||8,fx:p.x-p.vx,fy:p.y-p.vy}));
-    if(p.kind==='spell'||p.kind==='spirit')sparkle(p.x,p.y-14,3,p.color,0.7);
+    if(p.kind==='spell'&&p.el)elementFx(p.el,p.x,p.y-14,3,0.7);else if(p.kind==='spirit')sparkle(p.x,p.y-14,3,p.color,0.7);
     if(--p.pierce<0){p.dead=true;break;}
    }
   }
   if(!p.dead&&p.life<=0){if(p.explode)explodeProj(p);p.dead=true;}
   // sparkling trails (R17)
   if(p.kind!=='arrow'&&onScreen(p.x,p.y,80)){
-   if(Math.random()<0.75)particle('spark',p.x+rand(-4,4),p.y-14+rand(-4,4),Math.random()<0.25?'#ffffff':p.color,{v:rand(5,40),dur:rand(0.25,0.45),sz:rand(2,4.5)});
-   if(p.el&&EL_SHAPE[p.el]&&Math.random()<0.35)particle(EL_SHAPE[p.el],p.x,p.y-14,p.color,{v:rand(10,50),vy:EL_SHAPE[p.el]==='ember'?-40:0,dur:0.4,g:EL_SHAPE[p.el]==='debris'?300:0});
+   if(p.el){if(Math.random()<0.7)elPart(p.el,p.x+rand(-4,4),p.y-14+rand(-4,4),{v:rand(5,40)});   // element trail (R36-R45)
+    if(Math.random()<0.15)particle('spark',p.x,p.y-14,'#ffffff',{v:rand(5,30),dur:0.3,sz:rand(2,3.5)});}
+   else if(Math.random()<0.75)particle('spark',p.x+rand(-4,4),p.y-14+rand(-4,4),Math.random()<0.25?'#ffffff':p.color,{v:rand(5,40),dur:rand(0.25,0.45),sz:rand(2,4.5)});
   }
  }
  G.pproj=G.pproj.filter(p=>!p.dead);
@@ -995,13 +1043,13 @@ function update(dt){
  // player strikes (rain, meteors, psychic waves)
  for(const s of G.pstrikes){s.t+=dt;
   if(s.big&&!s.wave&&s.t<s.delay&&Math.random()<0.7){const p=s.t/s.delay;   // falling meteor leaves a trail
-   particle('ember',s.x+(1-p)*120+rand(-8,8),s.y-(1-p)*600+rand(-8,8),Math.random()<0.3?'#ffffff':s.color,{v:rand(10,40),vy:-30,dur:0.45,sz:rand(3,6)});}
+   elPart(s.el,s.x+(1-p)*120+rand(-8,8),s.y-(1-p)*600+rand(-8,8),{v:rand(10,40),dur:0.45});}
   if(s.t>=s.delay){s.done=true;damageCircle(s.x,s.y,s.r,s.dmg,Object.assign({},s.o,{knock:s.knock||10}));
   if(s.wave){addFx({kind:'ring',x:s.x,y:s.y,r0:s.r*0.2,r:s.r,color:s.color,w:14,dur:0.5});addFx({kind:'ring',x:s.x,y:s.y,r0:s.r*0.15,r:s.r*0.9,color:'#ffffff',w:5,dur:0.4});
-   addFx({kind:'spokes',x:s.x,y:s.y,r:s.r,n:18,color:s.color,dur:0.4});sparkRing(s.x,s.y,s.r*0.9,30,s.color);G.shake=Math.max(G.shake,10);continue;}
-  addFx({kind:'flash',x:s.x,y:s.y,r:s.r,color:s.color,dur:s.big?0.5:0.25});
+   addFx({kind:'spokes',x:s.x,y:s.y,r:s.r,n:18,color:s.color,dur:0.4});elRing(s.el,s.x,s.y,s.r*0.9,30);G.shake=Math.max(G.shake,10);continue;}
+  addFx({kind:'area',el:s.el,x:s.x,y:s.y,r:s.r,color:s.color,dur:s.big?0.6:0.3});
   if(s.big){addFx({kind:'ring',x:s.x,y:s.y,r0:20,r:s.r*1.1,color:'#ffffff',w:12,dur:0.5});burst(s.x,s.y,40,s.color,s.r/80);G.shake=Math.max(G.shake,s.r/25);
-   sparkle(s.x,s.y,20,s.color,s.r/70,s.r*0.4);debris(s.x,s.y,10,'#6a4a30',s.r/150);sparkRing(s.x,s.y,s.r,16,s.color);}
+   elementFx(s.el,s.x,s.y,20,s.r/70,s.r*0.4);debris(s.x,s.y,10,'#6a4a30',s.r/150);elRing(s.el,s.x,s.y,s.r,16);}
   else{burst(s.x,s.y,4,s.color,0.6);if(onScreen(s.x,s.y,60))elementFx(s.el,s.x,s.y,3,0.7);}}}
  G.pstrikes=G.pstrikes.filter(s=>!s.done);
  // zones: swirling motes inside the area
@@ -1012,12 +1060,12 @@ function update(dt){
  G.zones=G.zones.filter(z=>z.t>0);
  // beams
  for(const b of G.beams){b.t-=dt;b.tick-=dt;if(b.tick<=0){b.tick=0.1;const bx=P.x+Math.cos(P.aim)*b.len,by=P.y+Math.sin(P.aim)*b.len;
-  damageLine(P.x,P.y,bx,by,b.w,b.dps*0.1,Object.assign({},b.o,{knock:4,fx:P.x,fy:P.y}));sparkLine(P.x,P.y-14,bx,by-14,5,b.color,b.w);}}
+  damageLine(P.x,P.y,bx,by,b.w,b.dps*0.1,Object.assign({},b.o,{knock:4,fx:P.x,fy:P.y}));elLine(b.el,P.x,P.y-14,bx,by-14,5,b.w);}}
  G.beams=G.beams.filter(b=>b.t>0);
  // orbs
  for(const o of G.orbs){o.t-=dt;o.a+=dt*3.2;o.tick-=dt;
   if(o.tick<=0){o.tick=0.2;for(let k=0;k<o.n;k++){const a=o.a+k*TAU/o.n;damageCircle(P.x+Math.cos(a)*o.r,P.y+Math.sin(a)*o.r,24,o.dmg,Object.assign({},o.o,{knock:10}));}}
-  for(let k=0;k<o.n;k++)if(Math.random()<0.4){const a=o.a+k*TAU/o.n;particle('spark',P.x+Math.cos(a)*o.r,P.y+Math.sin(a)*o.r-14,o.color,{v:rand(5,30),dur:0.35,sz:rand(2,4)});}}
+  for(let k=0;k<o.n;k++)if(Math.random()<0.4){const a=o.a+k*TAU/o.n;elPart(o.el,P.x+Math.cos(a)*o.r,P.y+Math.sin(a)*o.r-14,{v:rand(5,30),dur:0.35});}}
  G.orbs=G.orbs.filter(o=>o.t>0);
  // pickups
  for(const p of G.pickups){const q=dist2(p.x,p.y,P.x,P.y);
@@ -1038,8 +1086,8 @@ function update(dt){
 }
 function explodeProj(p){
  damageCircle(p.x,p.y,p.explode,p.dmg,Object.assign({},p.o,{knock:p.knock||15,slow:p.slow||(p.o&&p.o.slow)||0}));
- addFx({kind:'flash',x:p.x,y:p.y,r:p.explode,color:p.color,dur:0.25});addFx({kind:'ring',x:p.x,y:p.y,r0:5,r:p.explode,color:p.color,w:4,dur:0.25});
- burst(p.x,p.y,8,p.color);sparkle(p.x,p.y,8,p.color,p.explode/60,p.explode*0.4);if(p.el)elementFx(p.el,p.x,p.y,3,p.explode/80);p.dead=true;
+ addFx(p.el?{kind:'area',el:p.el,x:p.x,y:p.y,r:p.explode,color:p.color,dur:0.35}:{kind:'flash',x:p.x,y:p.y,r:p.explode,color:p.color,dur:0.25});addFx({kind:'ring',x:p.x,y:p.y,r0:5,r:p.explode,color:p.color,w:4,dur:0.25});
+ burst(p.x,p.y,8,p.color);if(p.el)elementFx(p.el,p.x,p.y,10,p.explode/60,p.explode*0.4);else sparkle(p.x,p.y,8,p.color,p.explode/60,p.explode*0.4);p.dead=true;
 }
 function stepParticles(dt){
  for(const p of G.parts){p.t+=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;const k=p.shape==='debris'?0.985:0.94;p.vx*=k;p.vy=p.vy*k+(p.g||0)*dt;p.rot=(p.rot||0)+(p.spin||0)*dt;}
@@ -1307,10 +1355,165 @@ function drawPlayer(){
  }
  ctx.restore();
 }
+/* ---------- R36-R45 element visuals ---------- */
+const hsh=k=>{const v=Math.sin(k*127.1+311.7)*43758.5453;return v-Math.floor(v);};   // stable pseudo-random per index
+// Upward flame tongue with its base centred on (x,y).
+function flamePath(x,y,w,h){ctx.beginPath();ctx.moveTo(x-w,y);ctx.quadraticCurveTo(x-w,y-h*0.55,x,y-h);ctx.quadraticCurveTo(x+w,y-h*0.55,x+w,y);ctx.quadraticCurveTo(x,y+w*0.6,x-w,y);ctx.closePath();}
+function starPath(x,y,n,ro,ri,rot){ctx.beginPath();for(let k=0;k<n*2;k++){const q=rot+k*Math.PI/n,rr=k%2?ri:ro;k?ctx.lineTo(x+Math.cos(q)*rr,y+Math.sin(q)*rr):ctx.moveTo(x+Math.cos(q)*rr,y+Math.sin(q)*rr);}ctx.closePath();}
+// Particles that glow (drawn in one additive pass) vs. solid ones (skulls, leaves, clouds, pixels, debris).
+const PART_GLOW=new Set(['spark','ember','shard','flame','crescent','flake','zap','shape','piece','circle','star','streak','wisp']);
+const PART_DRAW={
+ spark(p,l){const z=p.sz*(0.55+0.45*Math.sin(p.t*28+p.ph)),w=Math.max(1,z*0.28);   // twinkling 4-point star
+  ctx.fillRect(p.x-z,p.y-w/2,z*2,w);ctx.fillRect(p.x-w/2,p.y-z,w,z*2);ctx.globalAlpha=l*0.5;ctx.fillRect(p.x-w,p.y-w,w*2,w*2);},
+ ember(p,l){ctx.globalAlpha=l*0.4;ctx.beginPath();ctx.arc(p.x,p.y,p.sz*1.6,0,TAU);ctx.fill();ctx.globalAlpha=l;ctx.beginPath();ctx.arc(p.x,p.y,p.sz*0.6,0,TAU);ctx.fill();},
+ shard(p){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.beginPath();ctx.moveTo(0,-p.sz*1.3);ctx.lineTo(p.sz*0.5,0);ctx.lineTo(0,p.sz*1.3);ctx.lineTo(-p.sz*0.5,0);ctx.closePath();ctx.fill();ctx.restore();},
+ debris(p){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.fillRect(-p.sz/2,-p.sz/3,p.sz,p.sz*0.66);ctx.restore();},
+ flame(p,l){const s=p.sz*(0.6+0.4*l),fl=0.85+0.15*Math.sin(p.t*30+p.ph);flamePath(p.x,p.y,s*0.7,s*2.4*fl);ctx.fill();
+  ctx.fillStyle='#ffd24a';flamePath(p.x,p.y,s*0.35,s*1.3*fl);ctx.fill();},
+ crescent(p){const s=p.sz,j=p.jag||6;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.lineWidth=Math.max(1.2,s*0.16);ctx.beginPath();   // jagged ("rigged") crescent outline
+  for(let k=0;k<=j*2;k++){const q=-2.4+4.8*k/(j*2),rr=k%2?s*1.3:s;k?ctx.lineTo(Math.cos(q)*rr,Math.sin(q)*rr):ctx.moveTo(Math.cos(q)*rr,Math.sin(q)*rr);}
+  ctx.arc(s*0.45,0,s*0.78,2.2,-2.2,true);ctx.closePath();ctx.stroke();ctx.restore();},
+ flake(p){const s=p.sz;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.lineWidth=1.4;ctx.beginPath();
+  for(let k=0;k<6;k++){const q=k*TAU/6,c=Math.cos(q),n=Math.sin(q);ctx.moveTo(0,0);ctx.lineTo(c*s,n*s);
+   const bx=c*s*0.55,by=n*s*0.55;ctx.moveTo(bx,by);ctx.lineTo(bx+Math.cos(q+0.7)*s*0.35,by+Math.sin(q+0.7)*s*0.35);ctx.moveTo(bx,by);ctx.lineTo(bx+Math.cos(q-0.7)*s*0.35,by+Math.sin(q-0.7)*s*0.35);}
+  ctx.stroke();ctx.restore();},
+ skull(p){const s=p.sz;ctx.save();ctx.translate(p.x,p.y);ctx.lineWidth=1.5;ctx.beginPath();   // skull outline
+  ctx.arc(0,-s*0.15,s*0.75,Math.PI*0.8,Math.PI*0.2);ctx.lineTo(s*0.42,s*0.75);ctx.lineTo(-s*0.42,s*0.75);ctx.closePath();ctx.stroke();
+  ctx.beginPath();ctx.arc(-s*0.3,-s*0.12,s*0.19,0,TAU);ctx.moveTo(s*0.49,-s*0.12);ctx.arc(s*0.3,-s*0.12,s*0.19,0,TAU);ctx.stroke();
+  ctx.beginPath();for(let k=-1;k<=1;k++){ctx.moveTo(k*s*0.17,s*0.45);ctx.lineTo(k*s*0.17,s*0.75);}ctx.stroke();ctx.restore();},
+ zap(p){const s=p.sz,a=p.rot;ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(p.x-Math.cos(a)*s,p.y-Math.sin(a)*s);   // small zigzag
+  for(let k=1;k<=4;k++){const f=-1+k/2,o=(k%2?1:-1)*s*0.35;ctx.lineTo(p.x+Math.cos(a)*s*f-Math.sin(a)*o,p.y+Math.sin(a)*s*f+Math.cos(a)*o);}ctx.stroke();},
+ shape(p,l){const s=p.sz;ctx.lineWidth=2;if(p.n===8)starPath(p.x,p.y,4,s,s*0.4,p.rot);
+  else{ctx.beginPath();for(let k=0;k<p.n;k++){const q=p.rot+k*TAU/p.n;k?ctx.lineTo(p.x+Math.cos(q)*s,p.y+Math.sin(q)*s):ctx.moveTo(p.x+Math.cos(q)*s,p.y+Math.sin(q)*s);}ctx.closePath();}
+  ctx.stroke();ctx.globalAlpha=l*0.25;ctx.fill();},
+ piece(p){const k=p.sz*0.75;ctx.save();ctx.translate(p.x,p.y+k);ctx.rotate(Math.sin(p.rot)*0.4);ctx.scale(k,k);ctx.lineWidth=1.6/k;ctx.lineJoin='round';   // chess-piece outline
+  for(const q of PIECES[p.piece||'pawn'])ctx.stroke(q);ctx.restore();},
+ pixel(p){const s=Math.round(p.sz);ctx.fillRect(Math.round(p.x),Math.round(p.y),s,s);},
+ circle(p,l){ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,p.sz*(1+(1-l)*0.9),0,TAU);ctx.stroke();},
+ star(p,l){const tw=0.6+0.4*Math.sin(p.t*18+p.ph);starPath(p.x,p.y,5,p.sz*tw,p.sz*0.42*tw,p.rot);ctx.fill();},
+ streak(p,l){const a=Math.atan2(p.vy,p.vx),L=(p.len||20)*(0.4+0.6*l);ctx.lineWidth=p.sz;ctx.lineCap='round';ctx.beginPath();
+  ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-Math.cos(a)*L,p.y-Math.sin(a)*L);ctx.stroke();},
+ wisp(p){const s=p.sz,w=Math.sin(p.t*14+p.ph)*s*0.3;ctx.beginPath();ctx.arc(p.x,p.y,s*0.6,Math.PI,0);   // little spirit
+  ctx.quadraticCurveTo(p.x+s*0.6+w,p.y+s,p.x+w,p.y+s*1.6);ctx.quadraticCurveTo(p.x-s*0.6+w,p.y+s,p.x-s*0.6,p.y);ctx.closePath();ctx.fill();},
+ leaf(p){const s=p.sz;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.beginPath();ctx.ellipse(0,0,s,s*0.45,0,0,TAU);ctx.fill();
+  ctx.strokeStyle='#2c5e22';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-s,0);ctx.lineTo(s,0);ctx.stroke();ctx.restore();},
+ cloud(p,l){const s=p.sz;ctx.globalAlpha=l*0.55;ctx.fillStyle='#eef6f2';ctx.beginPath();ctx.arc(p.x-s*0.5,p.y,s*0.55,0,TAU);ctx.arc(p.x+s*0.5,p.y,s*0.5,0,TAU);
+  ctx.arc(p.x,p.y-s*0.35,s*0.65,0,TAU);ctx.fill();ctx.globalAlpha=l*0.35;ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(p.x,p.y+s*0.1,s*0.5,0,TAU);ctx.fill();},
+};
+function drawParticles(){
+ // solid shapes first, then the glowing ones in one additive pass
+ for(const p of G.parts){if(PART_GLOW.has(p.shape))continue;const l=1-p.t/p.dur;ctx.globalAlpha=l;ctx.fillStyle=p.c;ctx.strokeStyle=p.c;
+  const f=PART_DRAW[p.shape];if(f)f(p,l);else ctx.fillRect(p.x-p.sz/2,p.y-p.sz/2,p.sz,p.sz);}
+ ctx.save();ctx.globalCompositeOperation='lighter';
+ for(const p of G.parts){if(!PART_GLOW.has(p.shape))continue;const l=1-p.t/p.dur;ctx.globalAlpha=l;ctx.fillStyle=p.c;ctx.strokeStyle=p.c;PART_DRAW[p.shape](p,l);}
+ ctx.restore();ctx.globalAlpha=1;
+}
+// Element area effect at (x,y) with radius r. a = opacity (0..1), p = progress (0..1), flash = short burst.
+// Returns the style drawn so tests can check it. Hyper, light and earth keep the Round 2 look ('plain').
+function drawArea(el,x,y,r,a,p,flash){
+ const st=EL_AREA[el]||'plain',c=EL_COL[el]||'#fff',t=G.time;p=p||0;
+ const circ=rr=>{ctx.beginPath();ctx.arc(x,y,rr,0,TAU);};
+ ctx.save();
+ switch(st){
+  case 'fire':{ctx.globalAlpha=a*0.3;ctx.fillStyle='#ff4a12';circ(r);ctx.fill();ctx.globalAlpha=a*0.22;ctx.fillStyle='#ffb347';circ(r*0.55);ctx.fill();
+   const n=clamp(Math.round(r/9),10,48);
+   for(let k=0;k<n;k++){const q=k/n*TAU+hsh(k)*0.4,rr=r*(0.3+0.68*hsh(k+7)),h=(12+r*0.07)*(0.7+0.45*Math.sin(t*9+k*1.7));
+    ctx.globalAlpha=a*0.8;ctx.fillStyle=k%3?'#ff6a2b':'#ffd24a';flamePath(x+Math.cos(q)*rr,y+Math.sin(q)*rr*0.9,h*0.42,h);ctx.fill();}
+   break;}
+  case 'domain':{ctx.globalAlpha=a*0.5;ctx.fillStyle='#5a0808';circ(r);ctx.fill();   // deep red sun domain
+   ctx.globalAlpha=a*0.9;ctx.strokeStyle='#ff2a1a';ctx.lineWidth=3;starPath(x,y,28,r*1.05,r*0.97,t*0.4);ctx.stroke();
+   ctx.globalAlpha=a*0.6;ctx.strokeStyle='#c8231e';ctx.lineWidth=2;circ(r*0.7);ctx.stroke();
+   ctx.beginPath();for(let k=0;k<12;k++){const q=-t*0.6+k*TAU/12;ctx.moveTo(x+Math.cos(q)*r*0.22,y+Math.sin(q)*r*0.22);ctx.lineTo(x+Math.cos(q)*r*0.62,y+Math.sin(q)*r*0.62);}ctx.stroke();
+   ctx.globalAlpha=a*0.4;ctx.fillStyle='#ff6a3a';circ(r*0.18);ctx.fill();break;}
+  case 'ice':{ctx.globalAlpha=a*0.34;ctx.fillStyle='#cdf3ff';circ(r);ctx.fill();ctx.globalAlpha=a*0.8;ctx.strokeStyle='#7fd8ff';ctx.lineWidth=3;ctx.stroke();
+   ctx.strokeStyle='#ffffff';ctx.lineWidth=1.5;ctx.globalAlpha=a*0.7;ctx.beginPath();   // cracks in the ice
+   for(let k=0;k<7;k++){let q=k/7*TAU+hsh(k),px=x,py=y;ctx.moveTo(px,py);for(let s=1;s<=4;s++){q+=(hsh(k*9+s)-0.5)*0.6;px=x+Math.cos(q)*r*s/4.4;py=y+Math.sin(q)*r*s/4.4;ctx.lineTo(px,py);}}ctx.stroke();
+   ctx.globalAlpha=a*0.85;ctx.fillStyle='#e9fbff';const n=clamp(Math.round(r/14),10,32);   // crystal spikes on the rim
+   for(let k=0;k<n;k++){const q=k/n*TAU,tip=r*(1.06+0.08*hsh(k+3));ctx.beginPath();ctx.moveTo(x+Math.cos(q-0.05)*r*0.9,y+Math.sin(q-0.05)*r*0.9);
+    ctx.lineTo(x+Math.cos(q)*tip,y+Math.sin(q)*tip);ctx.lineTo(x+Math.cos(q+0.05)*r*0.9,y+Math.sin(q+0.05)*r*0.9);ctx.closePath();ctx.fill();}
+   break;}
+  case 'puddle':{const blob=(sc)=>{ctx.beginPath();for(let k=0;k<=24;k++){const q=k/24*TAU,rr=r*sc*(0.84+0.1*Math.sin(k*2.3+hsh(k)*6)+0.04*Math.sin(t*2+k));
+    k?ctx.lineTo(x+Math.cos(q)*rr,y+Math.sin(q)*rr):ctx.moveTo(x+Math.cos(q)*rr,y+Math.sin(q)*rr);}ctx.closePath();};
+   ctx.globalAlpha=a*0.55;ctx.fillStyle='#41700f';blob(1);ctx.fill();ctx.globalAlpha=a*0.7;ctx.strokeStyle='#9be04a';ctx.lineWidth=2.5;ctx.stroke();
+   ctx.globalAlpha=a*0.3;ctx.fillStyle='#9be04a';blob(0.6);ctx.fill();
+   ctx.strokeStyle='#c8ff7a';ctx.lineWidth=1.5;for(let k=0;k<12;k++){const ph=(t*0.8+hsh(k))%1,q=hsh(k+20)*TAU,rr=Math.sqrt(hsh(k+40))*r*0.75;   // bubbles
+    ctx.globalAlpha=a*(1-ph);ctx.beginPath();ctx.arc(x+Math.cos(q)*rr,y+Math.sin(q)*rr,2+ph*7,0,TAU);ctx.stroke();}
+   break;}
+  case 'storm':{ctx.globalAlpha=a*0.5;ctx.fillStyle='#59606b';circ(r);ctx.fill();ctx.fillStyle='#3d434c';   // grey thundercloud
+   for(let k=0;k<8;k++){const q=k/8*TAU+t*0.3;ctx.globalAlpha=a*0.35;ctx.beginPath();ctx.arc(x+Math.cos(q)*r*0.55,y+Math.sin(q)*r*0.55,r*0.32,0,TAU);ctx.fill();}
+   const seed=Math.floor(t*7);ctx.lineJoin='miter';
+   for(let b=0;b<3;b++){let px=x+(hsh(seed*13+b*5)-0.5)*r*1.2,py=y+(hsh(seed*7+b*3)-0.5)*r*1.2;const pts=[[px,py]];
+    for(let i=1;i<=6;i++){px+=(hsh(seed+b*31+i)-0.5)*r*0.4;py+=r*0.12;pts.push([px,py]);}
+    ctx.beginPath();pts.forEach((q,i)=>i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]));ctx.globalAlpha=a*0.9;ctx.strokeStyle='#ffe14d';ctx.lineWidth=3;ctx.stroke();
+    ctx.strokeStyle='#ffffff';ctx.lineWidth=1;ctx.stroke();}
+   break;}
+  case 'portal':{ctx.globalAlpha=a*0.6;ctx.fillStyle='#1b1640';circ(r);ctx.fill();   // periwinkle portal
+   for(let k=0;k<5;k++){const rr=r*(0.96-k*0.17);ctx.globalAlpha=a*0.85;ctx.strokeStyle=k%2?'#ccccff':'#8f9dff';ctx.lineWidth=3.5-k*0.5;
+    ctx.beginPath();ctx.ellipse(x,y,rr,rr*0.9,t*(0.6+k*0.35)*(k%2?-1:1),0,TAU*0.8);ctx.stroke();}
+   ctx.strokeStyle='#b8c2ff';ctx.lineWidth=2;for(let k=0;k<4;k++){const q=t*2+k*TAU/4;ctx.beginPath();ctx.arc(x,y,r*0.45,q,q+1.2);ctx.stroke();}
+   ctx.globalAlpha=a*0.55;ctx.fillStyle='#ccd3ff';circ(r*0.13);ctx.fill();break;}
+  case 'grid':{ctx.globalAlpha=a*0.42;ctx.fillStyle='#042a2a';circ(r);ctx.fill();ctx.save();circ(r);ctx.clip();   // tech grid
+   const g=clamp(r/7,14,36),off=(t*20)%g;ctx.globalAlpha=a*0.6;ctx.strokeStyle='#3ef0e0';ctx.lineWidth=1;ctx.beginPath();
+   for(let gx=x-r-off;gx<=x+r;gx+=g){ctx.moveTo(gx,y-r);ctx.lineTo(gx,y+r);}for(let gy=y-r-off;gy<=y+r;gy+=g){ctx.moveTo(x-r,gy);ctx.lineTo(x+r,gy);}ctx.stroke();
+   ctx.globalAlpha=a*0.3;ctx.fillStyle='#3ef0e0';ctx.fillRect(x-r,y-r+(t*r*1.3)%(2*r),2*r,5);
+   const sd=Math.floor(t*6);for(let k=0;k<7;k++){ctx.globalAlpha=a*0.45;ctx.fillRect(x-r+Math.floor(hsh(sd*3+k)*2*r/g)*g-off,y-r+Math.floor(hsh(sd*5+k*7)*2*r/g)*g-off,g,g);}
+   ctx.restore();ctx.globalAlpha=a*0.8;ctx.strokeStyle='#3ef0e0';ctx.lineWidth=2;circ(r);ctx.stroke();break;}
+  case 'warp':{for(let k=0;k<6;k++){const hue=Math.round(t*90+k*55+p*200)%360,rr=r*(1-k*0.15)*(1+0.05*Math.sin(t*5+k));   // colour-warping rings
+    ctx.globalAlpha=a*0.16;ctx.fillStyle='hsl('+hue+',85%,62%)';ctx.beginPath();ctx.arc(x+Math.sin(t*3+k)*r*0.05,y+Math.cos(t*2.6+k)*r*0.05,rr,0,TAU);ctx.fill();
+    ctx.globalAlpha=a*0.5;ctx.strokeStyle='hsl('+((hue+180)%360)+',90%,70%)';ctx.lineWidth=2;ctx.stroke();}
+   break;}
+  case 'night':{ctx.globalAlpha=a*0.78;ctx.fillStyle='#0b1030';circ(r);ctx.fill();ctx.globalAlpha=a*0.6;ctx.strokeStyle='#c9d6ff';ctx.lineWidth=2;ctx.stroke();
+   const n=clamp(Math.round(r/6),12,60);ctx.fillStyle='#ffffff';
+   for(let k=0;k<n;k++){const q=hsh(k)*TAU,rr=Math.sqrt(hsh(k+3))*r*0.94,sz=1+hsh(k+5)*2;ctx.globalAlpha=a*(0.35+0.65*Math.abs(Math.sin(t*3+k)));
+    ctx.fillRect(x+Math.cos(q)*rr-sz/2,y+Math.sin(q)*rr-sz/2,sz,sz);}
+   const mx=x+r*0.35,my=y-r*0.35,mr=Math.max(6,r*0.15);ctx.globalAlpha=a*0.95;ctx.fillStyle='#e8eeff';ctx.beginPath();ctx.arc(mx,my,mr,0,TAU);ctx.fill();
+   ctx.fillStyle='#0b1030';ctx.beginPath();ctx.arc(mx+mr*0.45,my-mr*0.2,mr*0.85,0,TAU);ctx.fill();break;}
+  case 'void':{ctx.globalAlpha=a*0.8;ctx.fillStyle='#14031f';circ(r);ctx.fill();ctx.globalAlpha=a*0.6;ctx.strokeStyle='#5b1a8a';ctx.lineWidth=8;ctx.stroke();   // dark purple void
+   ctx.globalAlpha=a*0.5;ctx.strokeStyle='#2a0a3d';ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,y,r*0.6,t,t+4);ctx.stroke();
+   const nh=clamp(Math.round(r/38),4,12),rise=clamp((flash?1:p*4),0,1);
+   for(let k=0;k<nh;k++){const q=k/nh*TAU+hsh(k)*0.5,rr=r*(0.2+0.6*hsh(k+11)),bx=x+Math.cos(q)*rr,by=y+Math.sin(q)*rr+10,L=(18+r*0.08)*rise*(0.8+0.2*Math.sin(t*3+k)),
+     sw=Math.sin(t*2.5+k)*6,hx=bx+sw,hy=by-L;
+    ctx.globalAlpha=a*0.9;ctx.strokeStyle='#2b0b40';ctx.lineWidth=6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(bx,by);ctx.quadraticCurveTo(bx-sw,by-L*0.5,hx,hy);ctx.stroke();
+    ctx.strokeStyle='#b07ae0';ctx.lineWidth=1.5;ctx.stroke();ctx.fillStyle='#2b0b40';ctx.beginPath();ctx.arc(hx,hy,5,0,TAU);ctx.fill();ctx.stroke();
+    ctx.lineWidth=2;ctx.beginPath();for(let f=0;f<4;f++){const fa=-Math.PI/2+(f-1.5)*0.4+Math.sin(t*6+k+f)*0.15;ctx.moveTo(hx+Math.cos(fa)*4,hy+Math.sin(fa)*4);ctx.lineTo(hx+Math.cos(fa)*11,hy+Math.sin(fa)*11);}ctx.stroke();}
+   break;}
+  case 'vines':{ctx.globalAlpha=a*0.35;ctx.fillStyle='#18320f';circ(r);ctx.fill();const nv=clamp(Math.round(r/25),6,18),grow=clamp(flash?1:p*4,0.15,1);
+   ctx.strokeStyle='#3f8f2a';ctx.lineWidth=4;ctx.lineCap='round';ctx.globalAlpha=a*0.9;
+   for(let k=0;k<nv;k++){const q=k/nv*TAU+hsh(k),e=q+1.1*grow;ctx.beginPath();ctx.moveTo(x+Math.cos(q)*r,y+Math.sin(q)*r);   // curling vines
+    ctx.quadraticCurveTo(x+Math.cos(q+0.6)*r*0.55,y+Math.sin(q+0.6)*r*0.55,x+Math.cos(e)*r*(1-0.8*grow),y+Math.sin(e)*r*(1-0.8*grow));ctx.stroke();}
+   const ns=clamp(Math.round(r/22),6,24);
+   for(let k=0;k<ns;k++){const q=hsh(k+50)*TAU,rr=Math.sqrt(hsh(k+60))*r*0.85,sx=x+Math.cos(q)*rr,sy=y+Math.sin(q)*rr,h=(14+r*0.08)*grow*(0.7+0.3*hsh(k+70));   // tree spikes
+    ctx.fillStyle='#6b4a2a';ctx.beginPath();ctx.moveTo(sx-h*0.28,sy);ctx.lineTo(sx,sy-h);ctx.lineTo(sx+h*0.28,sy);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#5fd068';ctx.beginPath();ctx.moveTo(sx-h*0.1,sy-h*0.65);ctx.lineTo(sx,sy-h);ctx.lineTo(sx+h*0.1,sy-h*0.65);ctx.closePath();ctx.fill();}
+   break;}
+  case 'fog':{ctx.globalAlpha=a*0.12;ctx.fillStyle='#dfe8ec';circ(r);ctx.fill();const n=clamp(Math.round(r/18),8,30);   // drifting fog banks
+   for(let k=0;k<n;k++){const q=hsh(k)*TAU,rr=Math.sqrt(hsh(k+1))*r*0.75;ctx.globalAlpha=a*0.13;ctx.beginPath();
+    ctx.arc(x+Math.cos(q)*rr+Math.sin(t*0.5+k)*r*0.1,y+Math.sin(q)*rr+Math.cos(t*0.4+k)*r*0.06,r*(0.22+0.2*hsh(k+2)),0,TAU);ctx.fill();}
+   break;}
+  default:ctx.globalAlpha=a*(flash?0.45:0.16);ctx.fillStyle=c;circ(r);ctx.fill();
+ }
+ ctx.restore();
+ return st;
+}
+// Spell bolt looks: ice snowflakes (R37), lightning thunderbolts (R39), fire flames (R36); others are glowing orbs.
+const boltLook=el=>({ice:'flake',lightning:'thunder',fire:'flame'})[el]||'orb';
+function drawBolt(p,a,y,look){
+ ctx.save();ctx.globalCompositeOperation='lighter';ctx.fillStyle=p.color;ctx.globalAlpha=0.3;ctx.beginPath();ctx.arc(p.x,y,p.r*2.2,0,TAU);ctx.fill();ctx.restore();
+ ctx.save();ctx.translate(p.x,y);
+ if(look==='flake'){ctx.rotate(G.time*5);const s=p.r*1.7;ctx.lineCap='round';
+  for(const [col,w] of [['#2a6f8f',4],['#e9fbff',2]]){ctx.strokeStyle=col;ctx.lineWidth=w;ctx.beginPath();
+   for(let k=0;k<6;k++){const q=k*TAU/6,c=Math.cos(q),n=Math.sin(q);ctx.moveTo(0,0);ctx.lineTo(c*s,n*s);const bx=c*s*0.55,by=n*s*0.55;
+    ctx.moveTo(bx,by);ctx.lineTo(bx+Math.cos(q+0.7)*s*0.4,by+Math.sin(q+0.7)*s*0.4);ctx.moveTo(bx,by);ctx.lineTo(bx+Math.cos(q-0.7)*s*0.4,by+Math.sin(q-0.7)*s*0.4);}ctx.stroke();}}
+ else if(look==='thunder'){ctx.rotate(a);const s=p.r*1.6,pts=[[-1.5,-0.3],[0.15,-0.55],[0,-0.1],[1.5,0.25],[-0.15,0.55],[0,0.1]];
+  ctx.beginPath();pts.forEach(([u,v],i)=>i?ctx.lineTo(u*s,v*s):ctx.moveTo(u*s,v*s));ctx.closePath();ctx.fillStyle='#ffe14d';ctx.fill();ctx.strokeStyle='#ffffff';ctx.lineWidth=1.5;ctx.stroke();}
+ else{ctx.rotate(a-Math.PI/2);ctx.fillStyle='#ff6a2b';flamePath(0,p.r*0.4,p.r*1.05,p.r*3.3);ctx.fill();ctx.fillStyle='#ffd24a';flamePath(0,p.r*0.4,p.r*0.6,p.r*2);ctx.fill();
+  ctx.fillStyle='#fff6d0';ctx.beginPath();ctx.arc(0,0,p.r*0.55,0,TAU);ctx.fill();}
+ ctx.restore();
+}
 function drawWorldFx(){
  // zones
- for(const z of G.zones){const p=1-z.t/z.dur;ctx.fillStyle=z.color;ctx.globalAlpha=0.16;ctx.beginPath();ctx.arc(z.x,z.y,z.r,0,TAU);ctx.fill();
-  ctx.globalAlpha=0.7;ctx.strokeStyle=z.color;ctx.lineWidth=3;ctx.setLineDash([14,10]);ctx.lineDashOffset=-G.time*60;ctx.stroke();ctx.setLineDash([]);
+ for(const z of G.zones){const p=1-z.t/z.dur,fade=clamp(Math.min(z.t/0.3,(z.dur-z.t)/0.2+0.6),0,1);drawArea(z.el,z.x,z.y,z.r,fade,p);
+  ctx.beginPath();ctx.arc(z.x,z.y,z.r,0,TAU);ctx.globalAlpha=0.7;ctx.strokeStyle=z.color;ctx.lineWidth=3;ctx.setLineDash([14,10]);ctx.lineDashOffset=-G.time*60;ctx.stroke();ctx.setLineDash([]);
   if(z.pull){for(let k=0;k<4;k++){const a=G.time*3+k*TAU/4;ctx.beginPath();ctx.arc(z.x,z.y,z.r*(0.25+0.15*k)*(z.swirl?1-p*0.8:1),a,a+1.5);ctx.stroke();}}
   ctx.globalAlpha=0.35;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(z.x,z.y,z.r*(0.55+0.08*Math.sin(G.time*4)),0,TAU);ctx.stroke();
   ctx.globalAlpha=1;}
@@ -1342,6 +1545,7 @@ function drawProjAndFx(){
    ctx.fillStyle='rgba(168,240,255,.25)';ctx.beginPath();ctx.arc(p.x,y,p.r*2,0,TAU);ctx.fill();ctx.restore();
    ctx.fillStyle='#e8fbff';ctx.beginPath();ctx.ellipse(p.x,y+w*0.3,p.r,p.r*0.8,a,0,TAU);ctx.fill();
    ctx.fillStyle='#1a2a3a';ctx.beginPath();ctx.arc(p.x+Math.cos(a)*3-2,y-2,1.6,0,TAU);ctx.arc(p.x+Math.cos(a)*3+2,y-2,1.6,0,TAU);ctx.fill();}
+  else if(p.kind==='spell'&&boltLook(p.el)!=='orb')drawBolt(p,a,y,boltLook(p.el));
   else{ctx.save();ctx.globalCompositeOperation='lighter';ctx.fillStyle=p.color;ctx.globalAlpha=0.3;ctx.beginPath();ctx.arc(p.x,y,p.r*2.2,0,TAU);ctx.fill();ctx.restore();
    ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,y,p.r,0,TAU);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(p.x-p.r*0.3,y-p.r*0.3,p.r*0.35,0,TAU);ctx.fill();}}
@@ -1356,6 +1560,7 @@ function drawProjAndFx(){
   switch(f.kind){
    case 'ring':ctx.strokeStyle=f.color;ctx.lineWidth=f.w*(1-p)+1;ctx.beginPath();ctx.arc(f.x,f.y,f.r0+(f.r-f.r0)*(1-(1-p)*(1-p)),0,TAU);ctx.stroke();break;
    case 'flash':ctx.globalAlpha=(1-p)*0.45;ctx.fillStyle=f.color;ctx.beginPath();ctx.arc(f.x,f.y,f.r,0,TAU);ctx.fill();break;
+   case 'area':drawArea(f.el,f.x,f.y,f.r*(0.85+0.15*Math.min(1,p*4)),1-p,p,true);break;
    case 'arc':ctx.strokeStyle=f.color;ctx.lineWidth=f.w;ctx.lineCap='round';ctx.beginPath();ctx.arc(f.x,f.y,f.r,f.a-f.spread,f.a-f.spread+2*f.spread*Math.min(1,p*2.5));ctx.stroke();break;
    case 'spin':ctx.strokeStyle=f.color;ctx.lineWidth=10*(1-p)+2;ctx.beginPath();ctx.arc(f.x,f.y,f.r*(0.6+0.4*p),p*TAU*2,p*TAU*2+TAU*0.8);ctx.stroke();break;
    case 'beam':ctx.strokeStyle=f.color;ctx.lineCap='round';ctx.lineWidth=f.w*(1-p);ctx.beginPath();ctx.moveTo(f.ax,f.ay);ctx.lineTo(f.bx,f.by);ctx.stroke();break;
@@ -1379,19 +1584,6 @@ function drawProjAndFx(){
  drawParticles();
  for(const t of G.texts){ctx.globalAlpha=1-Math.max(0,t.t-0.4)/0.4;txt(t.txt,t.x,t.y-t.t*40,t.big?20:14,t.c,'center');}
  ctx.globalAlpha=1;
-}
-function drawParticles(){
- // plain squares and debris first, then the glowing shapes in one additive pass
- for(const p of G.parts){if(p.shape==='spark'||p.shape==='ember'||p.shape==='shard')continue;ctx.globalAlpha=1-p.t/p.dur;ctx.fillStyle=p.c;
-  if(p.shape==='debris'){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.fillRect(-p.sz/2,-p.sz/3,p.sz,p.sz*0.66);ctx.restore();}
-  else ctx.fillRect(p.x-p.sz/2,p.y-p.sz/2,p.sz,p.sz);}
- ctx.save();ctx.globalCompositeOperation='lighter';
- for(const p of G.parts){if(p.shape!=='spark'&&p.shape!=='ember'&&p.shape!=='shard')continue;const life=1-p.t/p.dur;ctx.globalAlpha=life;ctx.fillStyle=p.c;
-  if(p.shape==='spark'){const z=p.sz*(0.55+0.45*Math.sin(p.t*28+p.ph)),w=Math.max(1,z*0.28);   // twinkling 4-point star
-   ctx.fillRect(p.x-z,p.y-w/2,z*2,w);ctx.fillRect(p.x-w/2,p.y-z,w,z*2);ctx.globalAlpha=life*0.5;ctx.fillRect(p.x-w,p.y-w,w*2,w*2);}
-  else if(p.shape==='ember'){ctx.globalAlpha=life*0.4;ctx.beginPath();ctx.arc(p.x,p.y,p.sz*1.6,0,TAU);ctx.fill();ctx.globalAlpha=life;ctx.beginPath();ctx.arc(p.x,p.y,p.sz*0.6,0,TAU);ctx.fill();}
-  else{ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.beginPath();ctx.moveTo(0,-p.sz*1.3);ctx.lineTo(p.sz*0.5,0);ctx.lineTo(0,p.sz*1.3);ctx.lineTo(-p.sz*0.5,0);ctx.closePath();ctx.fill();ctx.restore();}}
- ctx.restore();ctx.globalAlpha=1;
 }
 function drawHUD(){
  // player panel
