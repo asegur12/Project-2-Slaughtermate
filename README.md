@@ -17,7 +17,7 @@ powershell -ExecutionPolicy Bypass -File desktop\build.ps1
 | Left click | Basic attack (aimed at the mouse) |
 | Hold left click, release | Charged attack |
 | 1 / 2 / 3 | Cast equipped spells |
-| Esc / P | Pause |
+| Esc / P | Pause (Esc also closes the shop cart) |
 
 ## The game
 - **6 floors, each a new board.** Survive the swarm of black pieces until the floor's giant checkered boss arrives, then kill it to clear the floor. Every floor generates a fresh map with its own look: Opening (light, cool, sparse), Early Game, Midgame (the classic board), Middle Gambit (darker, denser), Climax (red and orange, with fire-shooting watchtowers you can destroy) and Endgame (a purple, black, white and gold maze).
@@ -26,9 +26,13 @@ powershell -ExecutionPolicy Bypass -File desktop\build.ps1
 - **Bosses:** Iron Pawn, Mad Knight, Cardinal Bishop, Siege Rook, Black Queen, Checkered King. Each has its own telegraphed attacks and enrages below 50% HP.
 - **Enemies:** pawns swarm, knights hop in L-shapes (over walls), bishops move diagonally and snipe, rooks charge along straight lines, queens fire volleys and lunge, and kings summon pawns and haste nearby allies.
 - **8 weapons** (pick 1 per run): Sword (Spin Slash), Bow (Great Arrow), Staff (Arcane Blast), Hammer (Earth Slam), Scythe (semicircle sweeps; Crude Reap heals you), Shield (knockback bashes; Shield Rush), Club (rectangular slams; wind-up swing with 3 chain explosions) and Tome (3 piercing spirits that deal damage over time; 9-spirit burst).
-- **75 spells in 5 tiers.** Each tier has one spell of each of 15 elements: fire, ice, lightning, earth, wind, nature, poison, arcane, light, sun, moon, darkness, tech, hyper and the new psychic **Mind** element, whose spells deal damage over time. Heavy tier 3–5 spells have a short wind-up. You can equip 3, and picking a spell you already own levels it up.
-- **Fair randomness.** Every level-up offers 3 cards. Each tier uses a shuffle bag, so every spell in a tier shows up before any repeats, and a pity counter raises the odds of tier 4–5 the longer you go without one.
-- **Shop** between floors: spell scrolls, relics (stat upgrades), a healing elixir and rerolls.
+- **75 spells in 5 tiers.** Each tier has one spell of each of 15 elements: fire, ice, lightning, earth, wind, nature, poison, arcane, light, sun, moon, darkness, tech, hyper and the psychic **Mind** element, whose spells deal damage over time. Heavy tier 3–5 spells have a short wind-up. You can equip 3, and picking a spell you already own levels it up.
+- **Every element looks different.** Fire burns with flames, sun spells are a deep red with jagged crescents, ice throws snowflakes and freezes the ground, poison leaves skulls and puddles, lightning crackles in grey storm clouds, arcane opens periwinkle portals, hyper scatters chess-piece outlines, tech draws grids and pixels, mind warps colour, moon brings a starry night sky, light streaks, darkness raises hands from a purple void, nature grows vines and tree spikes, and wind rolls in clouds and fog.
+- **Grandmaster spells.** Three ultra-rare spells rank above tier 5: **Game of Despair** (a black-and-white domain where phantom chess pieces feed an orb that bursts and weakens everything), **Mental Inversion** (mind-controls the swarm into fighting itself; every piece they take explodes) and **Grand Seal** (chains and five portals drag enemies in, then the seal explodes and freezes them). They can appear as rewards from floor 4 on, and the merchant cart sells one.
+- **Fair randomness.** Every level-up offers 3 cards. Each tier (Grandmaster too) uses a shuffle bag, so every spell in a tier shows up before any repeats, and pity counters raise the odds of tier 4–5 and Grandmaster cards the longer you go without one.
+- **Merchant cart.** After each boss on floors 1–5, a cart with three white pawn merchants rolls into the centre of the board. Walk into it to shop for spell scrolls, relics (stat upgrades), a healing elixir, rerolls and, from floor 4, a Grandmaster spell. Close it (Esc or the advance button) to go on to the next floor. Enemies drop **chess-piece fragments** (shards), which are the currency.
+- **Spell logbook.** The menu has a logbook of all 78 spells. A spell's page unlocks once you obtain it in a run.
+- **Crowns.** Win a run and that weapon gets a crown on the menu: small for Easy, medium for Normal, large for Hard.
 - **Scaling.** Enemy HP and damage rise with each floor, your level and time spent on the floor.
 - **Hall of Kings.** The menu shows the top 10 runs (highest floor, score, weapon and difficulty), saved in your browser.
 
