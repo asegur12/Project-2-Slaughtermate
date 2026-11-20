@@ -53,6 +53,14 @@ input{font:16px Georgia;padding:6px 10px;border-radius:6px;border:2px solid var(
 .diffs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px}
 .diffs .card{padding:7px 9px;text-align:center}.diffs .card h3{font-size:15px;margin:0}.diffs .card p{font-size:11px;margin:2px 0 0}
 #weapons .card{padding:8px 10px}#weapons .card p{font-size:12px;margin:0 0 2px}
+.crown{position:absolute;top:2px;right:44px;line-height:1;text-shadow:0 0 6px #000,1px 1px 0 #000}
+.shard{width:11px;height:15px;vertical-align:-2px}.frag{color:var(--ivory)}
+#logbook .panel{max-width:1100px}.loggrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+@media(max-width:900px){.loggrid{grid-template-columns:repeat(2,1fr)}}
+.logent{background:var(--ivory);color:#1b1209;border:3px solid #888;border-radius:8px;padding:7px 9px;font-size:12px}
+.logent h3{margin:2px 0;font-size:14px}.logent p{margin:0 0 2px;line-height:1.3}.logent .meta{opacity:.7}
+.logent.locked{background:#1e130b;color:#7a6050;border-style:dashed;text-align:center}.logent .lock{font-size:26px;display:block;color:#5a4030}
+.t6{border-color:#ff4fd8;box-shadow:0 0 16px #ff4fd8,inset 0 0 10px rgba(255,79,216,.4)}
 .eq{display:inline-block;margin:4px;padding:6px 10px;background:#1e130b;border:2px solid #7a5a32;border-radius:6px;font-size:14px}
 </style>
 </head>
@@ -77,6 +85,7 @@ input{font:16px Georgia;padding:6px 10px;border-radius:6px;border:2px solid var(
       </div>
     </div>
     <button class="btn" id="startBtn">BEGIN THE GAME</button>
+    <div class="row"><button class="btn small" id="logBtn">✦ SPELL LOGBOOK</button></div>
     <div class="controls">WASD move · Space dash · Left click attack · Hold left click to charge, release to unleash · 1 2 3 cast spells · Esc pause<br>
     Survive each floor, slay the giant checkered boss, get promoted, shop, repeat. Beat the King on Floor 6 to win.</div>
   </div>
@@ -94,6 +103,7 @@ input{font:16px Georgia;padding:6px 10px;border-radius:6px;border:2px solid var(
   </div>
 </div>
 <div id="end" class="overlay hidden"></div>
+<div id="logbook" class="overlay hidden"></div>
 
 <script>
 'use strict';
@@ -256,7 +266,8 @@ const SPELLS=[
  {id:'cataclysm',name:'Arcane Cataclysm',tier:5,el:'arcane',kind:'collapse',dmg:1250,r:500,delay:1.1,pull:280,windup:0.4,cd:26,desc:'Raw magic implodes, then explodes.'},
  {id:'psistrike',name:'Psionic Strike',tier:5,el:'mind',kind:'psystrike',dmg:900,r:650,dot:[150,4],windup:0.6,cd:26,desc:'Your mind takes physical form: three huge psychic shockwaves tear through everything around you.'},
 ];
-const SPELL_BY_ID={};SPELLS.forEach(s=>SPELL_BY_ID[s.id]=s);
+const ALL_SPELLS=SPELLS.slice();   // every obtainable spell, listed in the logbook (R49)
+const SPELL_BY_ID={};ALL_SPELLS.forEach(s=>SPELL_BY_ID[s.id]=s);
 const SPELL_PRICE=[0,45,90,160,280,460];
 const UPGRADES=[
  {id:'dmg',ico:'🗡',name:'Sharpened Steel',desc:'+15% weapon damage',apply:()=>{P.dmgMult+=0.15;}},
@@ -350,6 +361,8 @@ addEventListener('keydown',e=>{
   if(k===' '||e.code==='Space'){e.preventDefault();dash();}
   if(k==='escape'||k==='p')setPaused(true);
  }else if(G.state==='paused'&&(k==='escape'||k==='p'))setPaused(false);
+ else if(G.state==='shop'&&k==='escape'&&$('replace').classList.contains('hidden'))closeShop();
+ else if(G.state==='menu'&&k==='escape')$('logbook').classList.add('hidden');
 });
 addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
 cv.addEventListener('mousemove',e=>{mouse.x=e.clientX;mouse.y=e.clientY;});
@@ -448,7 +461,7 @@ let G,P;
 function makeState(){
  return {state:'menu',time:0,runTime:0,floor:1,floorTime:0,phase:'wave',dur:75,enemies:[],pproj:[],eproj:[],hazards:[],pstrikes:[],zones:[],beams:[],orbs:[],
   pickups:[],fx:[],parts:[],texts:[],timers:[],casts:[],dealt:0,structs:genMap(1),theme:FLOOR_THEMES[0],difficulty:'normal',clubBlasts:0,shake:0,score:0,kills:0,pity:0,bags:{1:[],2:[],3:[],4:[],5:[]},statBag:[],
-  pendingLevels:0,spawnAcc:0,packT:16,banner:null,boss:null,weapon:'sword',clearT:0,shop:null};
+  pendingLevels:0,spawnAcc:0,packT:16,banner:null,boss:null,weapon:'sword',clearT:0,shop:null,cart:null,cartT:0};
 }
 function xpFor(l){return Math.floor(6+l*3.5+l*l*0.15);}
 function makePlayer(w){
@@ -632,7 +645,7 @@ function killEnemy(e){
  if(e.boss){onBossDown(e);return;}
  if(G.phase==='cleared')return;
  G.pickups.push({x:e.x,y:e.y,k:'xp',v:e.xp*(1+0.25*(G.floor-1))});
- if(Math.random()<0.3)G.pickups.push({x:e.x+rand(-10,10),y:e.y+rand(-10,10),k:'gold',v:e.gold*randi(1,2)});
+ if(Math.random()<0.3)G.pickups.push({x:e.x+rand(-10,10),y:e.y+rand(-10,10),k:'frag',v:e.gold*randi(1,2),rot:rand(0,TAU)});
 }
 function gainXp(v){
  P.xp+=v;
@@ -966,7 +979,7 @@ function bossUpdate(b,dt){
  if(b.atkT<=0){b.atkT=rand(2.0,3.0);bossAttack(b,pick(BOSS_ATTACKS[b.type]));}
 }
 function onBossDown(b){
- G.score+=2500*G.floor;P.gold+=60*G.floor;G.boss=null;G.phase='cleared';G.clearT=3.5;G.shake=20;
+ G.score+=2500*G.floor;P.gold+=60*G.floor;G.boss=null;G.phase='cleared';G.clearT=3.5;G.cartT=CART_DELAY;G.cart=null;G.shake=20;
  for(const e of G.enemies)if(!e.dead){e.dead=true;burst(e.x,e.y-e.s,6,'#2a2a33');}
  G.eproj=[];G.hazards=[];G.timers=[];
  for(const p of G.pickups){if(p.k==='xp')gainXp(p.v);else P.gold+=p.v;}G.pickups=[];
@@ -981,7 +994,7 @@ function onBossDown(b){
 /* ================= FLOOR FLOW ================= */
 function startFloor(){
  G.floorTime=0;G.phase='wave';G.dur=60+15*G.floor;G.spawnAcc=0;G.packT=rand(12,16);
- G.enemies=[];G.pproj=[];G.eproj=[];G.hazards=[];G.pstrikes=[];G.zones=[];G.beams=[];G.orbs=[];G.pickups=[];G.timers=[];G.casts=[];
+ G.enemies=[];G.pproj=[];G.eproj=[];G.hazards=[];G.pstrikes=[];G.zones=[];G.beams=[];G.orbs=[];G.pickups=[];G.timers=[];G.casts=[];G.cart=null;
  // every floor is a new board (R19): new layout and colour theme, player back in the centre
  G.theme=themeFor(G.floor);G.structs=genMap(G.floor);P.x=WORLD/2;P.y=WORLD/2;P.rush=null;P.dashT=0;P.windup=0;
  banner('Floor '+G.floor+': '+G.theme.name,G.theme.sub+' · Survive until the '+BOSSES[G.floor-1].name+' arrives');
@@ -991,7 +1004,7 @@ function startFloor(){
 }
 function newRun(w,d){
  G=makeState();G.weapon=w;G.difficulty=DIFFICULTY[d]?d:'normal';P=makePlayer(w);
- const id=drawSpell(1,new Set());P.spells[0]={id,lvl:1,cd:0,cdMax:1};
+ const id=drawSpell(1,new Set());P.spells[0]={id,lvl:1,cd:0,cdMax:1};unlockSpell(id);
  startFloor();hideAll();G.state='play';
 }
 function update(dt){
@@ -1070,7 +1083,7 @@ function update(dt){
  // pickups
  for(const p of G.pickups){const q=dist2(p.x,p.y,P.x,P.y);
   if(q<P.magnet*P.magnet||p.pull){p.pull=true;const d=Math.sqrt(q)||1;p.x+=(P.x-p.x)/d*600*dt;p.y+=(P.y-p.y)/d*600*dt;}
-  if(q<(P.r+10)**2){p.done=true;if(p.k==='xp')gainXp(p.v);else{P.gold+=p.v;floatText(P.x,P.y-40,'+'+p.v+'g','#e0b84f');}}}
+  if(q<(P.r+10)**2){p.done=true;if(p.k==='xp')gainXp(p.v);else{P.gold+=p.v;floatText(P.x,P.y-40,'+'+p.v+' ◆','#f4ecd8');}}}
  if(G.pickups.length>450){for(const p of G.pickups.splice(0,G.pickups.length-450)){if(p.k==='xp')gainXp(p.v);else P.gold+=p.v;}}
  G.pickups=G.pickups.filter(p=>!p.done);
  // visuals
@@ -1081,7 +1094,7 @@ function update(dt){
  G.shake*=Math.max(0,1-6*dt);
  // floor progress
  if(G.phase==='wave'&&G.floorTime>=G.dur)spawnBoss();
- if(G.phase==='cleared'){G.clearT-=dt;if(G.clearT<=0){if(G.floor>=6)endRun(true);else openShop();}}
+ if(G.phase==='cleared'){if(G.floor>=6){G.clearT-=dt;if(G.clearT<=0)endRun(true);}else updateCart(dt);}
  G.enemies=G.enemies.filter(e=>!e.dead);
 }
 function explodeProj(p){
@@ -1123,9 +1136,40 @@ function updatePlayer(dt){
 /* ================= UI: MENUS ================= */
 let selWeapon='sword',selDifficulty='normal';
 const DIFF_DESC={easy:'Enemies have less HP and hit softer. Score ×0.75',normal:'The standard board. Score ×1',hard:'Tougher enemies, harder hits, faster shots. Score ×1.5'};
-function hideAll(){for(const id of ['menu','levelup','replace','shop','pause','end'])$(id).classList.add('hidden');}
+function hideAll(){for(const id of ['menu','levelup','replace','shop','pause','end','logbook'])$(id).classList.add('hidden');}
 function loadScores(){try{return JSON.parse(localStorage.getItem('slaughtermate_scores')||'[]');}catch(e){return [];}}
 function saveScores(a){try{localStorage.setItem('slaughtermate_scores',JSON.stringify(a));}catch(e){}}
+/* ---------- R49 spell logbook ---------- */
+function loadLog(){try{return new Set(JSON.parse(localStorage.getItem('slaughtermate_logbook')||'[]'));}catch(e){return new Set();}}
+// Called whenever the player obtains a spell. Returns true the first time.
+function unlockSpell(id){
+ const s=loadLog();if(s.has(id))return false;s.add(id);
+ try{localStorage.setItem('slaughtermate_logbook',JSON.stringify([...s]));}catch(e){}
+ if(G.state!=='menu')floatText(P.x,P.y-80,'New logbook entry: '+SPELL_BY_ID[id].name,'#c9d6ff');
+ return true;
+}
+function showLogbook(){
+ const log=loadLog(),el=$('logbook'),got=ALL_SPELLS.filter(s=>log.has(s.id)).length;
+ let h='<div class="panel"><h1 style="font-size:34px">SPELL LOGBOOK</h1><p class="sub">'+got+' / '+ALL_SPELLS.length+' spells discovered. Obtain a spell in a run to read its page.</p>';
+ for(let t=1;t<=6;t++){
+  h+='<h2 style="color:'+TIER_COL[t]+'">'+TIER_NAME[t].toUpperCase()+'</h2><div class="loggrid">';
+  for(const s of ALL_SPELLS.filter(s=>s.tier===t)){
+   if(log.has(s.id))h+='<div class="logent t'+t+'"><span class="badge" style="background:'+(EL_COL[s.el]||'#ccc')+'">'+s.el+'</span><h3>'+esc(s.name)+'</h3><p>'+esc(s.desc)+'</p>'+
+    '<p class="meta">Cooldown '+s.cd+'s'+(s.dmg?' · Power '+s.dmg:'')+(s.windup?' · Wind-up '+s.windup+'s':'')+'</p></div>';
+   else h+='<div class="logent locked t'+t+'"><span class="lock">?</span><h3>???</h3><p>'+TIER_NAME[t]+' · not yet discovered</p></div>';
+  }
+  h+='</div>';
+ }
+ el.innerHTML=h+'<button class="btn" id="logClose">CLOSE</button></div>';
+ $('logClose').onclick=()=>el.classList.add('hidden');
+ el.classList.remove('hidden');
+}
+/* ---------- R50 weapon crowns ---------- */
+const CROWN_RANK={easy:1,normal:2,hard:3},CROWN_PX={easy:16,normal:24,hard:34},CROWN_COL={easy:'#c98a4a',normal:'#d9dbe8',hard:'#f2c94c'};
+function loadCrowns(){try{return JSON.parse(localStorage.getItem('slaughtermate_crowns')||'{}');}catch(e){return {};}}
+function awardCrown(w,d){const c=loadCrowns();if(!c[w]||CROWN_RANK[d]>CROWN_RANK[c[w]]){c[w]=d;try{localStorage.setItem('slaughtermate_crowns',JSON.stringify(c));}catch(e){}return true;}return false;}
+function crownHTML(w){const d=loadCrowns()[w];if(!d)return '';
+ return '<span class="crown" title="Cleared on '+DIFFICULTY[d].name+'" style="font-size:'+CROWN_PX[d]+'px;color:'+CROWN_COL[d]+'">♔</span>';}
 function showMenu(){
  hideAll();G=makeState();P=makePlayer('sword');G.state='menu';
  const sc=loadScores();
@@ -1138,11 +1182,12 @@ function showMenu(){
   d.innerHTML=`<h3>${DIFFICULTY[k].name}</h3><p>${DIFF_DESC[k]}</p>`;d.onclick=()=>{selDifficulty=k;showMenu();};db.appendChild(d);}
  const wb=$('weapons');wb.innerHTML='';
  for(const k in WEAPONS){const w=WEAPONS[k],d=document.createElement('div');d.className='card stat'+(k===selWeapon?' sel':'');
-  d.innerHTML=`<span class="ico">${w.ico}</span><h3>${w.name}</h3><p>${w.desc}</p><p><b>Charged:</b> ${w.cdesc}</p>`;
+  d.innerHTML=`${crownHTML(k)}<span class="ico">${w.ico}</span><h3>${w.name}</h3><p>${w.desc}</p><p><b>Charged:</b> ${w.cdesc}</p>`;
   d.onclick=()=>{selWeapon=k;showMenu();};wb.appendChild(d);}
  $('menu').classList.remove('hidden');
 }
 $('startBtn').onclick=()=>newRun(selWeapon,selDifficulty);
+$('logBtn').onclick=()=>showLogbook();
 function setPaused(on){if(on){G.state='paused';mouse.down=false;$('pause').classList.remove('hidden');}else{G.state='play';$('pause').classList.add('hidden');}}
 $('resumeBtn').onclick=()=>setPaused(false);
 $('quitBtn').onclick=()=>{$('pause').classList.add('hidden');G.state='play';endRun(false);};
@@ -1167,9 +1212,9 @@ function openLevelUp(){
 function finishLevel(){G.pendingLevels--;if(G.pendingLevels>0)openLevelUp();else resume();}
 function equipSpell(id,done){
  const i=P.spells.findIndex(s=>s&&s.id===id);
- if(i>=0){P.spells[i].lvl++;return done();}
+ if(i>=0){unlockSpell(id);P.spells[i].lvl++;return done();}
  const e=P.spells.findIndex(s=>!s);
- if(e>=0){P.spells[e]={id,lvl:1,cd:0,cdMax:1};return done();}
+ if(e>=0){unlockSpell(id);P.spells[e]={id,lvl:1,cd:0,cdMax:1};return done();}
  const el=$('replace'),s=SPELL_BY_ID[id];
  el.innerHTML=`<div class="panel" style="max-width:820px"><h1 style="font-size:30px">Your spell slots are full</h1>
   <p class="sub">Replace a spell with <b style="color:${TIER_COL[s.tier]}">${s.name}</b> (Tier ${s.tier}), or discard it.</p><div class="cards3"></div>
@@ -1177,12 +1222,30 @@ function equipSpell(id,done){
  const box=el.querySelector('.cards3');
  P.spells.forEach((sp,k)=>{const d=document.createElement('div');d.className='card t'+SPELL_BY_ID[sp.id].tier;
   d.innerHTML=`<span class="badge" style="background:#ddd">Slot ${k+1}</span> `+spellCardHTML(sp.id,'<p><b>Replace this</b></p>').replace(/<small>.*?<\/small>/,'<small>(Lv '+sp.lvl+')</small>');
-  d.onclick=()=>{P.spells[k]={id,lvl:1,cd:0,cdMax:1};el.classList.add('hidden');done();};box.appendChild(d);});
+  d.onclick=()=>{unlockSpell(id);P.spells[k]={id,lvl:1,cd:0,cdMax:1};el.classList.add('hidden');done();};box.appendChild(d);});
  $('discardBtn').onclick=()=>{el.classList.add('hidden');done();};
  el.classList.remove('hidden');
 }
 
 /* ================= SHOP ================= */
+// R46/R47: after a floor's boss dies (floors 1-5) a merchant cart rolls into the centre of the board,
+// with 3 white pawn merchants. Touching it opens the shop; closing the shop starts the next floor.
+const CART_R=46,CART_DELAY=1;
+function spawnCart(){
+ G.cart={x:WORLD/2,y:WORLD/2,t:0,pawns:[{dx:-74,dy:18,ph:0},{dx:76,dy:22,ph:2.1},{dx:6,dy:-62,ph:4.2}]};
+ addFx({kind:'ring',x:G.cart.x,y:G.cart.y,r0:10,r:160,color:'#e0b84f',w:8,dur:0.7});glint(G.cart.x,G.cart.y-30,24,1.6,60);
+ floatText(G.cart.x,G.cart.y-90,'The merchant cart has arrived!','#e0b84f',true);
+}
+function updateCart(dt){
+ if(!G.cart){G.cartT-=dt;if(G.cartT<=0)spawnCart();return;}
+ G.cart.t+=dt;
+ if(dist2(P.x,P.y,G.cart.x,G.cart.y)<(P.r+CART_R)**2)openShop();
+}
+function closeShop(){$('shop').classList.add('hidden');$('replace').classList.add('hidden');G.floor++;startFloor();resume();}
+// Inline shard icon for the HTML panels (R48).
+const SHARD_SVG='<svg class="shard" viewBox="0 0 12 16" aria-hidden="true"><polygon points="6,0 11,5 9,14 3,16 1,7" fill="#f4ecd8" stroke="#1b1209"/><polygon points="6,0 9,14 3,16" fill="#b9ad94"/></svg>';
+const frags=n=>SHARD_SVG+' '+n+' fragments';
+
 function openShop(){
  G.state='shop';mouse.down=false;
  G.shop={spells:[],stats:[],sold:{},reroll:25,potion:false};
@@ -1194,27 +1257,27 @@ function rollShopSpells(){const ex=new Set();G.shop.spells=[];for(let i=0;i<4;i+
 function renderShop(){
  const S=G.shop,el=$('shop'),f=G.floor,statPrice=70+25*f,potPrice=25+10*f;
  el.innerHTML=`<div class="panel"><h1 style="font-size:34px">THE ROYAL BAZAAR</h1>
-  <p class="sub">Floor ${f} cleared · You are a <b>${FORM_NAMES[P.form]}</b> · Gold: <b class="gold">${P.gold}</b> · HP ${Math.ceil(P.hp)}/${P.maxHp}</p>
+  <p class="sub">The merchant pawns greet you · Floor ${f} cleared · You are a <b>${FORM_NAMES[P.form]}</b> · <b class="frag">${frags(P.gold)}</b> · HP ${Math.ceil(P.hp)}/${P.maxHp}</p>
   <h2>SPELL SCROLLS</h2><div class="cards3 four" id="shSpells"></div>
   <h2>RELICS & POTIONS</h2><div class="cards3 four" id="shItems"></div>
   <h2>YOUR SPELLS</h2><div class="row">${P.spells.map((s,i)=>`<span class="eq">${i+1}: ${s?SPELL_BY_ID[s.id].name+' Lv'+s.lvl:'— empty —'}</span>`).join('')}</div>
-  <div class="row"><button class="btn small" id="shRe">Reroll scrolls (${S.reroll}g)</button></div>
-  <button class="btn" id="shGo">ADVANCE TO FLOOR ${f+1}: ${themeFor(f+1).name.toUpperCase()} ▶</button></div>`;
+  <div class="row"><button class="btn small" id="shRe">Reroll scrolls (${frags(S.reroll)})</button></div>
+  <button class="btn" id="shGo">ADVANCE TO FLOOR ${f+1}: ${themeFor(f+1).name.toUpperCase()} ▶</button><p class="sub">Esc also closes the cart and advances</p></div>`;
  const sb=$('shSpells');
  S.spells.forEach((id,i)=>{const s=SPELL_BY_ID[id],price=SPELL_PRICE[s.tier],sold=S.sold[i],d=document.createElement('div');
   d.className='card t'+s.tier+(sold||P.gold<price?' dis':'');
-  d.innerHTML=spellCardHTML(id,`<p class="price">${sold?'SOLD':price+' gold'}</p>`);
+  d.innerHTML=spellCardHTML(id,`<p class="price">${sold?'SOLD':frags(price)}</p>`);
   d.onclick=()=>{if(sold||P.gold<price)return;P.gold-=price;S.sold[i]=true;equipSpell(id,()=>{G.state='shop';renderShop();});};
   sb.appendChild(d);});
  const ib=$('shItems');
  const pot=document.createElement('div');pot.className='card stat'+(S.potion||P.gold<potPrice||P.hp>=P.maxHp?' dis':'');
- pot.innerHTML=`<span class="badge" style="background:#e88">Potion</span><span class="ico">⚗</span><h3>Royal Elixir</h3><p>Fully restore your HP.</p><p class="price">${S.potion?'SOLD':potPrice+' gold'}</p>`;
+ pot.innerHTML=`<span class="badge" style="background:#e88">Potion</span><span class="ico">⚗</span><h3>Royal Elixir</h3><p>Fully restore your HP.</p><p class="price">${S.potion?'SOLD':frags(potPrice)}</p>`;
  pot.onclick=()=>{if(S.potion||P.gold<potPrice||P.hp>=P.maxHp)return;P.gold-=potPrice;P.hp=P.maxHp;S.potion=true;renderShop();};ib.appendChild(pot);
  S.stats.forEach((u,i)=>{const sold=S.sold['u'+i],d=document.createElement('div');d.className='card stat'+(sold||P.gold<statPrice?' dis':'');
-  d.innerHTML=`<span class="badge" style="background:#c9a56a">Relic</span><span class="ico">${u.ico}</span><h3>${u.name}</h3><p>${u.desc}</p><p class="price">${sold?'SOLD':statPrice+' gold'}</p>`;
+  d.innerHTML=`<span class="badge" style="background:#c9a56a">Relic</span><span class="ico">${u.ico}</span><h3>${u.name}</h3><p>${u.desc}</p><p class="price">${sold?'SOLD':frags(statPrice)}</p>`;
   d.onclick=()=>{if(sold||P.gold<statPrice)return;P.gold-=statPrice;S.sold['u'+i]=true;u.apply();renderShop();};ib.appendChild(d);});
  $('shRe').onclick=()=>{if(P.gold<S.reroll)return;P.gold-=S.reroll;S.reroll+=15;const keep={};for(const k in S.sold)if(k[0]==='u')keep[k]=true;rollShopSpells();Object.assign(S.sold,keep);renderShop();};
- $('shGo').onclick=()=>{el.classList.add('hidden');G.floor++;startFloor();resume();};
+ $('shGo').onclick=closeShop;
  el.classList.remove('hidden');
 }
 
@@ -1224,6 +1287,7 @@ function endRun(won){
  if(G.state==='over')return;
  G.state='over';mouse.down=false;
  const final=Math.round((G.score+(G.floor-1)*1000+P.level*50+(won?10000:0))*diff().score);G.final=final;
+ const crowned=won&&awardCrown(G.weapon,G.difficulty);
  const m=Math.floor(G.runTime/60),s=Math.floor(G.runTime%60);
  const el=$('end');
  el.innerHTML=`<div class="panel" style="max-width:640px;text-align:center">
@@ -1232,6 +1296,7 @@ function endRun(won){
   <div class="stats"><div>Score<b>${final.toLocaleString()}</b></div><div>Floor<b>${G.floor}${won?' ♔':''}</b></div><div>Kills<b>${G.kills}</b></div>
   <div>Level<b>${P.level}</b></div><div>Weapon<b>${WEAPONS[G.weapon].name}</b></div><div>Time<b>${m}:${String(s).padStart(2,'0')}</b></div></div>
   <p class="sub">Difficulty: ${diff().name} (score ×${diff().score})</p>
+  ${crowned?`<p class="sub" style="color:${CROWN_COL[G.difficulty]}">♔ New crown for the ${WEAPONS[G.weapon].name} (${diff().name})!</p>`:''}
   <p>Name for the Hall of Kings: <input id="nameIn" maxlength="14" value="${esc(getName())}"></p>
   <button class="btn" id="saveBtn">SAVE & RETURN</button></div>`;
  $('saveBtn').onclick=()=>{
@@ -1319,6 +1384,34 @@ function drawEnemy(e){
  drawPiece(e.type,e.x+ox,e.y-bob-e.z,e.s,{fill:e.flash>0?'#b83a2e':(e.boss?CHECK:'#24242b'),stroke:e.boss?'#e0b84f':'#a8a8b8',lw:e.boss?3:1.5,rot,
   sx:e.flash>0?1.1:1,sy:e.flash>0?0.9:1,flip:P.x<e.x,glow,eye:e.boss?'#ff3030':'#ff5050'});
  if(!e.boss&&e.hp<e.maxHp){const w=e.s*2;bar(e.x-w/2,e.y-e.s*2.7-bob-e.z,w,4,e.hp/e.maxHp,'#d33');}
+}
+function drawCart(){
+ const c=G.cart,t=G.time,x=c.x,y=c.y,pop=Math.min(1,c.t/0.4);
+ ctx.save();ctx.globalAlpha=0.35+0.25*Math.sin(t*4);ctx.strokeStyle='#e0b84f';ctx.lineWidth=3;ctx.setLineDash([10,8]);ctx.lineDashOffset=-t*30;
+ ctx.beginPath();ctx.arc(x,y,CART_R+18,0,TAU);ctx.stroke();ctx.restore();
+ ctx.save();ctx.translate(x,y);ctx.scale(pop,pop);
+ shadow(0,10,56,0.35);
+ for(const wx of [-34,34]){ctx.fillStyle='#3b2618';ctx.beginPath();ctx.arc(wx,2,15,0,TAU);ctx.fill();ctx.strokeStyle='#e0b84f';ctx.lineWidth=2;ctx.stroke();   // wheels
+  ctx.beginPath();for(let k=0;k<6;k++){const q=k*TAU/6+Math.sin(t)*0.2;ctx.moveTo(wx,2);ctx.lineTo(wx+Math.cos(q)*13,2+Math.sin(q)*13);}ctx.lineWidth=1.5;ctx.stroke();}
+ ctx.fillStyle='#7a4e2c';ctx.fillRect(-52,-34,104,32);ctx.strokeStyle='#2b1a0e';ctx.lineWidth=2;ctx.strokeRect(-52,-34,104,32);   // wooden body
+ ctx.beginPath();for(let k=-52+26;k<52;k+=26){ctx.moveTo(k,-34);ctx.lineTo(k,-2);}ctx.stroke();
+ ctx.fillStyle='#e0b84f';ctx.fillRect(-56,-38,112,5);
+ ctx.strokeStyle='#2b1a0e';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-48,-38);ctx.lineTo(-48,-74);ctx.moveTo(48,-38);ctx.lineTo(48,-74);ctx.stroke();
+ for(let k=0;k<8;k++){ctx.fillStyle=k%2?'#151515':'#ece6d6';ctx.beginPath();ctx.moveTo(-60+k*15,-74);ctx.lineTo(-45+k*15,-74);ctx.lineTo(-45+k*15+2,-62);ctx.lineTo(-60+k*15+2,-62);ctx.closePath();ctx.fill();}   // checkered canopy
+ ctx.strokeStyle='#e0b84f';ctx.lineWidth=2;ctx.strokeRect(-60,-80,120,6);
+ drawShard(0,-96+Math.sin(t*3)*4,9,Math.sin(t*2)*0.3);   // floating fragment sign
+ ctx.restore();
+ for(const p of c.pawns){const b=Math.abs(Math.sin(t*4+p.ph))*4,sw=Math.sin(t*2+p.ph)*0.08;   // 3 white pawn merchants
+  shadow(x+p.dx,y+p.dy,13,0.28);drawPiece('pawn',x+p.dx,y+p.dy-b,13*pop,{fill:'#f6f2e6',stroke:'#2b2b2b',lw:2,rot:sw,flip:p.dx>0,eye:'#2b2b2b'});}
+}
+// A chess-piece fragment: an ivory shard with a darker facet and a glint (R48).
+function drawShard(x,y,s,rot){
+ ctx.save();ctx.translate(x,y);if(rot)ctx.rotate(rot);
+ ctx.beginPath();ctx.moveTo(0,-s*1.25);ctx.lineTo(s*0.7,-s*0.35);ctx.lineTo(s*0.45,s*0.95);ctx.lineTo(-s*0.25,s*1.15);ctx.lineTo(-s*0.7,s*0.1);ctx.closePath();
+ ctx.fillStyle='#f4ecd8';ctx.fill();ctx.strokeStyle='#1b1209';ctx.lineWidth=1.5;ctx.stroke();
+ ctx.beginPath();ctx.moveTo(0,-s*1.25);ctx.lineTo(s*0.45,s*0.95);ctx.lineTo(-s*0.25,s*1.15);ctx.closePath();ctx.fillStyle='#2a2a33';ctx.globalAlpha=0.55;ctx.fill();
+ ctx.globalAlpha=1;ctx.fillStyle='#ffffff';ctx.fillRect(-s*0.3,-s*0.5,s*0.22,s*0.5);
+ ctx.restore();
 }
 function drawPlayer(){
  const t=G.time,type=FORMS[P.form],s=15+P.form*0.7;
@@ -1534,7 +1627,7 @@ function drawWorldFx(){
  // pickups
  for(const p of G.pickups){if(!onScreen(p.x,p.y,20))continue;
   if(p.k==='xp'){ctx.fillStyle='#5fd0ff';ctx.beginPath();ctx.moveTo(p.x,p.y-7);ctx.lineTo(p.x+5,p.y);ctx.lineTo(p.x,p.y+7);ctx.lineTo(p.x-5,p.y);ctx.closePath();ctx.fill();ctx.strokeStyle='#103040';ctx.lineWidth=1;ctx.stroke();}
-  else{ctx.fillStyle='#e0b84f';ctx.beginPath();ctx.arc(p.x,p.y,6,0,TAU);ctx.fill();ctx.strokeStyle='#6a4a10';ctx.lineWidth=1.5;ctx.stroke();}}
+  else drawShard(p.x,p.y,6,(p.rot||0)+Math.sin(G.time*3+p.x)*0.3);}
 }
 function drawProjAndFx(){
  for(const p of G.pproj){const a=Math.atan2(p.vy,p.vx),y=p.y-14;
@@ -1594,7 +1687,7 @@ function drawHUD(){
  if(P.shield>0){ctx.fillStyle='rgba(220,190,140,.7)';ctx.fillRect(82,44,248*clamp(P.shield/P.maxHp,0,1),6);}
  txt(Math.ceil(P.hp)+' / '+P.maxHp,206,58,12,'#fff','center');
  bar(82,68,248,8,P.xp/P.xpNext,'#5fd0ff');
- txt('◉ '+P.gold+'   '+WEAPONS[G.weapon].ico+' '+WEAPONS[G.weapon].name,82,98,15,'#e0b84f','left');
+ drawShard(90,93,7,0);txt(String(P.gold),102,98,15,'#f4ecd8','left');txt(WEAPONS[G.weapon].ico+' '+WEAPONS[G.weapon].name,186,98,15,'#e0b84f','left');
  // score panel
  panel(VW-202,12,190,72);
  txt('Score '+G.score.toLocaleString(),VW-192,38,16,'#f4ecd8');
@@ -1609,7 +1702,11 @@ function drawHUD(){
   panel(cx-260,12,520,56);txt('FLOOR '+G.floor+' · THE '+b.name.toUpperCase()+(b.enraged?' (ENRAGED)':''),cx,32,16,b.enraged?'#ff7070':'#e0b84f','center');
   ctx.fillStyle=CHECK;ctx.save();ctx.translate(cx-245,40);ctx.scale(40,40);ctx.fillRect(0,0,490/40,16/40);ctx.restore();
   bar(cx-245,40,490,16,b.hp/b.maxHp,'#b0121b','rgba(0,0,0,.6)');txt(Math.ceil(b.hp).toLocaleString(),cx,53,12,'#fff','center');}
- else{panel(cx-170,12,340,40);txt('FLOOR '+G.floor+' · '+G.theme.name.toUpperCase()+' CLEARED',cx,38,17,'#e0b84f','center');}
+ else{panel(cx-170,12,340,40);txt('FLOOR '+G.floor+' · '+G.theme.name.toUpperCase()+' CLEARED',cx,38,17,'#e0b84f','center');
+  if(G.cart){txt('Visit the merchant cart in the centre of the board',cx,72,14,'#f4ecd8','center');
+   const sx=G.cart.x-cam.x,sy=G.cart.y-cam.y;if(sx<0||sy<0||sx>VW||sy>VH){const a=Math.atan2(sy-VH/2,sx-VW/2),ax=VW/2+Math.cos(a)*Math.min(VW,VH)*0.38,ay=VH/2+Math.sin(a)*Math.min(VW,VH)*0.38;
+    ctx.save();ctx.translate(ax,ay);ctx.rotate(a);ctx.fillStyle='#e0b84f';ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(18,0);ctx.lineTo(-10,-12);ctx.lineTo(-4,0);ctx.lineTo(-10,12);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
+    drawShard(ax,ay-24,7,0);}}}
  if(G.difficulty!=='normal')txt(diff().name.toUpperCase(),VW-22,100,12,G.difficulty==='hard'?'#ff7070':'#8fd08f','right');
  // spell slots
  const sw=72,gap=12,sx=cx-(sw*3+gap*2)/2,sy=VH-sw-16;
@@ -1640,6 +1737,7 @@ function drawHUD(){
  ctx.fillStyle='#d33';for(const e of G.enemies)if(!e.boss&&!e.static)ctx.fillRect(mx+e.x*k-1,my+e.y*k-1,2,2);
  ctx.fillStyle='#ff8a3c';for(const e of G.enemies)if(e.static)ctx.fillRect(mx+e.x*k-3,my+e.y*k-3,6,6);
  if(G.boss){ctx.fillStyle=CHECK;ctx.fillStyle='#e0b84f';ctx.fillRect(mx+G.boss.x*k-4,my+G.boss.y*k-4,8,8);}
+ if(G.cart){ctx.fillStyle='#e0b84f';ctx.fillRect(mx+G.cart.x*k-5,my+G.cart.y*k-5,10,10);ctx.strokeStyle='#000';ctx.lineWidth=1.5;ctx.strokeRect(mx+G.cart.x*k-5,my+G.cart.y*k-5,10,10);}
  ctx.fillStyle='#fff';ctx.fillRect(mx+P.x*k-3,my+P.y*k-3,6,6);
  ctx.strokeStyle='rgba(255,255,255,.4)';ctx.lineWidth=1;ctx.strokeRect(mx+cam.x*k,my+cam.y*k,VW*k,VH*k);
  // banner
@@ -1654,8 +1752,9 @@ function render(){
  drawGround();drawWorldFx();drawStructures();
  const list=G.enemies.filter(e=>!e.dead&&onScreen(e.x,e.y,e.s*3+20));
  if(G.state!=='menu')list.push(P);
+ if(G.cart)list.push({cart:true,y:G.cart.y});
  list.sort((a,b)=>a.y-b.y);
- for(const e of list){if(e===P){if(G.state!=='over'||P.hp>0)drawPlayer();}else drawEnemy(e);}
+ for(const e of list){if(e===P){if(G.state!=='over'||P.hp>0)drawPlayer();}else if(e.cart)drawCart();else drawEnemy(e);}
  drawProjAndFx();
  ctx.restore();
  if(G.state!=='menu')drawHUD();
