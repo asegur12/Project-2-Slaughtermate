@@ -1,7 +1,7 @@
 {
   "name": "slaughtermate",
   "private": true,
-  "description": "Chess-themed hack'n'slash game (single offline HTML file).",
+  "description": "Magic Rush (formerly Slaughtermate): a fantasy hack'n'slash with an optional chess theme (single offline HTML file).",
   "scripts": {
     "test": "node --test tests/"
   }
