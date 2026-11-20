@@ -3,6 +3,38 @@
 Standing rules for every session are in `CLAUDE.md`. Read that first. This file only covers the
 state at the end of Round 2.
 
+==ROUND 3 RUN==
+
+The client has played the game now again, and believes there is some new changes needed
+
+Spell designs: The sparkles and particles were a very nice touch, but now its kinda confusing on the spells actual type, therefore, there should be some new changes to the spells, specifically to their designs
+	-Fire and sun: Fire should be its same color with fire particle effects instead of sparkles, sun spells should be a deeper red with rigged cresent outlines as particle effects, large and small, both area type spells should be a fire for fire spells and a deep red domain for sun
+	-Ice: snowflakes for projectiles and ice as the area of effects
+	-Poison: Skulls as outlines and poison puddles as the domain for area of effects
+	-Lightning: Thunderbolts and smaller zigzag lines for projectiles and particles, as for area's, grey with lightning
+	-Arcane and Hyper: various shapes as particles and larger particle effects with a perrywinkle portal for the area of effect attacks of Arcane, as for hyper, piece outlines of the same color, area effect design remains unchanged
+	-Tech and mind, tech should be a grid for the areas of effects and pixels for the particle effects, Mind should have Large circles and a warping color area of effect
+	-Moon: Stars should be the particle effects and the area effects should be a night sky
+	-Light and darkness: Light should now add more lines as streaks and the area effects remain unchanged, Darkness should have hands coming from a dark purple void for area effects and spirits for particle effects
+	-Nature, vines and tree spikes for area effects and leaves for the particle effects
+	-Wind: clouds for particle effects and fog for area effects
+
+Shop changes: the shop is now different: it now spawns on the middle of the map, its a cart with 3 white pawns near it
+	-Touching it opens the shop
+	-Money changes: The money is now different, currency is now chess piece fragments, now taking the shape of a shard
+	-Pressing escape will close the shop
+
+New things
+	-Spell logbook: now there is a menu at the beginning that shows you every spell that can be obtained, but you can view them once you unlock them in runs
+	-Show a crown for every weapon you clear a run with, scaling in size depending on cleared difficulty
+	-New spell tier: Grandmaster
+		-These are ultra powerful spells that rank above tier 5, Abundantly powerful and very flashy, they have no set theme but are rather a collection of special spells these will be the ones for now
+		-Game of despair: A massive area is shadowed by a Black and white domain, phantoms of chess pieces circle the area, dancing and gathering power to a large orb at the center, it then burts, dealing huge damage and weakening all enemies affected by it (draw inspiration from shadow milk cookies act 1:lies skil
+		-Mental inversion: Release a pulse that will cause all enemies hit by it to be mind controlled and attack their fellow enemies, with each enemy they kill, they explode, dealing damage, the effect wears off after a bit
+		-Grand seal: chains surround a massive area, 5 portals appear that pull in enemies, it explodes, dealing damage and freezing enemies, draw inspiration from dark enchantress cookies skill, visions of doom
+
+that will be all for run 3
+
 ## Current state
 
 - Branch `main` is pushed to `origin` (github.com/asegur12/Project-2-Slaughtermate). The last
