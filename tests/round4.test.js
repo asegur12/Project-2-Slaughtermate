@@ -570,8 +570,8 @@ test('R74 Hellfire: crimson fireballs fly in from the screen edge, horizontally 
 test('R75 Excalibur: a giant sword falls, plants with a shockwave, then fires a huge beam of light', () => {
   const g = arena(75);
   const tx = g.run('P.x+300'), ty = g.run('P.y');
-  g.run(`var N=spawnEnemy('pawn',${tx + 80},${ty + 40}),L=spawnEnemy('pawn',${tx + 900},${ty}),O=spawnEnemy('pawn',${tx},${ty + 900});
-    for(const e of [N,L,O]){e.hp=e.maxHp=1e7;e.dmg=0;e.stunT=1e9;}`);
+  g.run(`var N=spawnEnemy('pawn',${tx + 80},${ty + 40}),FAR=spawnEnemy('pawn',${tx + 900},${ty}),O=spawnEnemy('pawn',${tx},${ty + 900});
+    for(const e of [N,FAR,O]){e.hp=e.maxHp=1e7;e.dmg=0;e.stunT=1e9;}`);
   cast(g, 'excalibur', tx, ty);
   g.step(0.3);
   const R = g.run("G.rituals.find(r=>r.kind==='excalibur')");
@@ -580,10 +580,10 @@ test('R75 Excalibur: a giant sword falls, plants with a shockwave, then fires a 
   assert.equal(g.run('N.hp'), g.run('N.maxHp'));
   g.step(0.7);
   assert.ok(g.run('N.maxHp-N.hp') >= g.run('SPELL_BY_ID.excalibur.quake') * 0.9, 'the landing shockwave');
-  assert.equal(g.run('L.hp'), g.run('L.maxHp'), 'the beam has not fired yet');
+  assert.equal(g.run('FAR.hp'), g.run('FAR.maxHp'), 'the beam has not fired yet');
   g.run('render();');
   g.step(2.5);
-  assert.ok(g.run('L.maxHp-L.hp') >= g.run('SPELL_BY_ID.excalibur.dmg') * 0.9, 'a long beam of light in the aimed direction');
+  assert.ok(g.run('FAR.maxHp-FAR.hp') >= g.run('SPELL_BY_ID.excalibur.dmg') * 0.9, 'a long beam of light in the aimed direction');
   assert.ok(g.run('O.maxHp-O.hp') < g.run('SPELL_BY_ID.excalibur.dmg') * 0.1, 'only along the beam');
 });
 
