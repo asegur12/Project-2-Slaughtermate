@@ -9,6 +9,7 @@ optional theme (R62).
   has added later rounds' requirements elsewhere:
   - Round 3: the "==ROUND 3 RUN==" section of `handoff-round-2.md`.
   - Round 4: the "==ROUND 4 CHANGES AND ADDITIONS==" section of `handoff-round-3.md`.
+  - Round 5: the "==ROUND 5 CHANGES AND ADDITIONS==" section of `handoff-round-4.md`.
 
   Check `spec.md`'s source list for where each round came from. The user's prompt may mention a
   `problem.md`; it doesn't exist. Look in the latest handoff file and ask if the requirements
@@ -36,12 +37,14 @@ optional theme (R62).
   closes the shop cart (R47).
 - Rebuild the exe (`powershell -ExecutionPolicy Bypass -File desktop\build.ps1`) after changing
   `index.html`. `dist\` is git-ignored, so the exe is local only.
-- localStorage keys keep their `slaughtermate_` prefix: `scores`, `name`, `logbook`, `crowns`
-  and `look`. Renaming them would wipe players' saves.
+- localStorage keys keep their `slaughtermate_` prefix: `scores`, `name`, `logbook`, `crowns`,
+  `look`, and since Round 5 `bells`, `gmcrowns`, `bestiary` and `face`. Renaming them would wipe
+  players' saves.
 
 ## Code conventions in `index.html`
-- `index.html` uses **LF** line endings (an earlier note said CRLF; that was wrong). Git prints
-  LF→CRLF warnings; they are harmless.
+- Line endings: the repository stores **LF**, but `core.autocrlf=true` makes the working copy
+  **CRLF**. Scripts that patch files must handle CRLF (normalise to LF, edit, write back as CRLF).
+  Git's LF→CRLF warnings are harmless.
 - **Two looks (R55/R62, `docs/decisions/0005`):**
   - The global `LOOK` is `'fantasy'` (the default) or `'chess'`. Only drawing and user-facing text
     may depend on it. Gameplay, stats and AI must not.
@@ -67,6 +70,22 @@ optional theme (R62).
   `castGrandmaster` switch, advanced in `updateRituals`, and drawn by `drawRitualGround` (under
   the units) and `drawRituals` (above them). A new Grandmaster spell needs a `GM_SPELLS` entry
   plus a case in each of these.
+- **Boss Grandmaster spells (R82, `docs/decisions/0006`):** the Grandmaster casts the same rituals
+  with `foe:true` through `bossGM`, and `updateRituals` has a `foe` branch that hurts the player.
+  A new Grandmaster spell also needs a foe version, or must stay out of `GM_FOE_SPELLS`. Tier 1–5
+  boss spells go through `bossCast` (telegraphed enemy attacks).
+- **Pinned lists:** earlier tests require that `FLOOR_THEMES`, `BOSSES` and `SPAWN_W` keep 6
+  entries, that `ENEMY_LOOK` keeps its 6 keys, and that `Object.keys(AI)` stays
+  `pawn,knight,bishop,rook,queen,watchtower,king`.
+  - Put new enemies in `AI5`/`EXTRA_LOOK` (looked up through `enemyFig()`).
+  - Put new floors behind `themeFor()`/`bossDef()`. Floor 7 is `DOMAIN_THEME`.
+  - Build new bosses as separate definitions with `makeBoss`.
+  - `pieceLook()` is the "draw enemies as chess pieces" check (the chess theme, or floor 7). Use
+    it instead of `LOOK==='chess'` for enemies.
+- **Weapons:** weapon damage is `wdmg()`, which includes the weapon tier (R86). Tier 1 of every
+  weapon must keep its pre-Round 5 behaviour, which older tests check.
+- Every player damage shape (`damageCircle`/`Arc`/`Rect`/`Line` and player projectiles) calls
+  `pokeMerchants`, so a new damage path should too (R77).
 - Level-up cards have three types: `'spell'`, `'gm'` and `'stat'`.
 - Spell visuals go through the element helpers: `elPart`, `elementFx`, `elRing`, `elLine`, and
   `glint` for white glints. Area effects go through `drawArea(el, ...)`. A spell must not emit
@@ -79,7 +98,8 @@ optional theme (R62).
   Nightmare (R72) needs it. `shootE`/`hzCircle`/`hzLine` record the source automatically
   through `curShooter`.
 - Anything that loops over enemies should decide how to treat enemies that are mind-controlled
-  (`e.charmT>0`), asleep (`e.sleepT>0`) or static towers (`e.static`).
+  (`e.charmT>0`), asleep (`e.sleepT>0`), static towers (`e.static`), sweeping rook-wall rooks
+  (`e.sweep`), enraged (`e.kamikaze>0`), or a dying Grandmaster (`e.dying>=0`).
 - The real canvas throws on negative `arc`/`ellipse` radii, but the test stub doesn't. Keep radii
   positive and check new visuals in a real browser. Additive blending (`'lighter'`) of yellow on
   the green floors turns lime, so avoid it there.
@@ -114,12 +134,20 @@ optional theme (R62).
     this.
   - Set `slaughtermate_look` in a script that runs before the game script to choose the theme.
   - Check both themes.
+  - `--virtual-time-budget` can freeze forever on scenes with many boss telegraphs on screen. This
+    is a headless quirk, not a game hang. Use `--timeout=2500` for those scenes, and give every
+    Edge call a process timeout.
+  - The cart and the portal appear at the map centre, where the player starts. Move the player
+    away first, or the shop opens.
+  - To test the Grandmaster's face, pass random images from
+    `C:\Users\aidan\OneDrive\Pictures\Reaction images` through `setFace`. The user asked for this.
 
 ## Tooling on this Windows machine
 - In the Bash tool, heredocs containing emoji fail, and so do long heredocs with many quotes. Write
   scripts to the scratchpad with the Write tool and run them from there.
 - `VAR=x cmd "$VAR"` in one command expands `$VAR` before it is assigned.
 - Edge is at `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`.
+- Python has no Pillow. To make a contact sheet, screenshot an HTML grid of the PNGs with Edge.
 
 ## Git
 - Never undo, amend, rebase or force-push a commit. Fix forward with a new commit.

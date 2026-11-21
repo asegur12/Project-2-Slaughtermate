@@ -3,6 +3,102 @@
 Standing rules for every session are in `CLAUDE.md`. Read that first. This file only covers the
 state at the end of Round 4.
 
+==ROUND 5 CHANGES AND ADDITIONS==
+
+The client is enjoying this game so far, but now he believes its time for some new systems and additions
+
+==BOSSES==
+
+Two new bosses will be added, both are optional but require a specific condition to be fought
+
+-Secret boss 1: The merchant
+	-Condition: if the player hits the merchant, he says "Stop that", hits him again, and the shopkeeper says "Im warning you". On the third hit, the cart disappears and a new boss appears
+	-The merchant: The 3 shopkeepers now ride their cart, while attacking and ramming into the player, a new enemy spawns on this boss exclusively that being the shop helper
+		-The merchant is able to use some spells up to tier 4, but these spells are largely weakened
+		-The shop helpers act like pawns/goblins, but are more tanky
+	-Defeating the merchant will allow you to rob him and get 500 gold from him
+	-This fight can only be fought once per run
+	-A new bell icon appears on the beginning screen if you defeated the merchant in a run with that weapon
+
+-Secret final boss: The grandmaster
+	-Condition: On the third floor, a grand disciple enemy will spawn, hidden amongst the swarm and has a lot of hp, defeating him will cause him to explode, killing every enemy around him, except bosses. Upon completing the floor, a grandmasters draft will appear where he died, picking it up will cause you to lose some hp, but will now allow you to fight the grandmaster and go to the 7th floor
+	-Grandmaster: The evil entity of massive power, he dwells on the 7th floor, the grandmasters domain
+		-A giant black and white chess board, instead of medieval enemies, chess pieces return as enemies with slightly larger checkered ones now appearing in the midst of the swarm along with grand disciples
+		-The grandmaster will have the regular boss movement behavior, but he has different attacks
+			-Summons a wall of checkered rooks that sweep the screen, dealing heavy damage but the rooks can be defeated as they move
+			-Promotes all nearby enemies into rooks or queens
+			-Enrages all enemies, making the charge headfirst towards the player, killing themselves to deal damage
+			-Casts any of the grandmaster tier spells, with a longer windup and slightly reduced area, but still dealing heavy damage
+				-Mental inversion will buff enemies when grandmaster casts it
+				-hellfire is excluded
+	-The grandmaster slowly glows light and then explodes, clearing the run
+	-An upside down crown is now inplace when you defeated him with a weapon in a run
+
+-Other bosses: bosses can now use spells, but are weaker
+	-First boss: tier 1 spells
+	-Second boss: tier 2 and lower spells
+	-Third boss: tier 3 and lower
+	-Fourth boss: tier 4 and lower
+	-Fifth boss: tier 5 and lower
+	-sixth boss: tier 5 and tier 4
+
+++NEW ADDITIONS++
+-Enemy logbook: a logbook for enemies, a chess themed one and the medieval themed one
+
+-Weapon perks and upgrades: In an earlier spec, The client wanted weapons with cool perks, now its time to add them
+-The shop now offers weapon upgrades for money, the weapon can be upgraded up to tier 5
+	-Sword upgrades:
+		-tier 1: default
+		-tier 2: Gold sword, a larger slash radius and a double spin slash, more damage
+		-tier 3: Obsidian sword, larger slash radius and the charged is now a wide wave slash, more damage
+		-tier 4: Enchanted sword, A slower charged default that hits a massive area, a tri-wave slash for the charged and more damage
+		-Tier 5; Mirror sword, A 3 hit wide slice, and the charged is now a massive wave beam
+	-Designs are similar for every weapon
+	-Hammer:
+		-tier 2: bigger smash and now slows enemies for the charged
+		-tier 3: basic attack now release a weak pulse, the charge now is a leaping crush
+		-tier 4: same, but with more damage
+		-Tier 5: The pulse now causes more pulses with every enemy hit, the charged now destroys the map itself for a bit
+	-Archer:
+		-tier 2: 3 arrows now shot at once, the charge now shoots 3 arrows
+		-tier 3: shoots 5 arrows for both attacks
+		-tier 4: arrows now naturally pierce enemies, the charge now causes 3 massive arrows to stop and home in on 3 enemies
+		-tier 5: shoots 10 arrows for both attacks
+	-Mage:
+		-tier 2: magic bursts cause chain explosions on enemies, charge now casts a random spell in your inventory
+		-tier 3: larger chain explosions and the charged attack now pulls enemies inwards
+		-tier 4: magic bursts shoot out small orbs that explode, charge is unchanged
+		-tier 5: Cause pillars of magic to slowly move away from you, the charge now causes a giant laser to smite an area
+	-Scythe:
+		-tier 2: basic attacks now steal hp and the charged doubles the hp stolen
+		-tier 3: basic attacks through a scythe that deals dmg, the charged does the same
+		-tier 4: widens and triples the scythes thrown for basic attacks, the charge now greatly enlargens your scythe and slash it around you, dealing damage and stealing hp
+		-tier 5: 5 scythes thrown instead of 3, the charged now causes you to warp to the mouse and inflict large slices that steal hp
+	-Club:
+		-tier 2: larger area and explosions
+		-tier 3: chain explosions instead for the basic attack, the charged is now a large line of bursts that travel far
+		-tier 4: explosions now push enemies away and the charged is the same but weakens enemies
+		-tier 5: Causes many explosions in a wide cone and the charged now lets you double-wield
+	-Shield:
+		-tier 2: dash farther and the charged now pushes enemies further
+		-tier 3: reduces ranged damage and the dash now gives you a shield around you for 5 seconds
+		-tier 4: Your dash now has a wind force, pushing enemies away and the charged will increase its shield duration
+		-tier 5: Increases the wind force and your dash is a great charge that now drags enemies with your wide area and increases shield size
+	-Tome:
+		-tier 2: more spirits on the basic attack and the charge spirits now home in on enemies
+		-Tier 3: spirits now lock on and follow an enemy, the charged now releases more spirits
+		-Tier 4: spirits now stop and then fly towards an enemy, and explode, charged spirits do the same
+		-Tier 5: Spirits will now explode and leave behind a small area of effect for 3 seconds, charged spirits leave a longer lasting area
+
+-assume tier 1 is the default phase and every upgrade increases damage
+
+++Slight changes++
+-Cursor: make the cursor more visible, its too hard to see, make it a black bullseye or a black circle
+-Grandmasters design: The grandmaster is a giant eye with 2 large floating hands that are checkered, he has a checkered crown halo above him, the grand disciples are the eye part alone
+	-In the beginning part, the player can have the option to give the grandmaster a face, in which they can upload an image from their computer and it will be set as the face for the grandmaster and grand disciples
+
+==END ROUND 5==
+
 ## Current state
 
 - **The game is now called Magic Rush**, a fantasy medieval hack'n'slash. The Round 3 chess look
