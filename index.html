@@ -63,6 +63,7 @@ input{font:16px Georgia;padding:6px 10px;border-radius:6px;border:2px solid var(
 .diffs .card{padding:7px 9px;text-align:center}.diffs .card h3{font-size:15px;margin:0}.diffs .card p{font-size:11px;margin:2px 0 0}
 #weapons .card{padding:8px 10px}#weapons .card p{font-size:12px;margin:0 0 2px}
 .crown{position:absolute;top:2px;right:44px;line-height:1;text-shadow:0 0 6px #000,1px 1px 0 #000}
+.marks{position:absolute;top:3px;right:82px;display:flex;gap:3px;line-height:0}.marks .crown{position:static}.bell svg{display:block}
 .shard{width:11px;height:15px;vertical-align:-2px}.frag{color:var(--ivory)}
 #logbook .panel{max-width:1100px}.loggrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 @media(max-width:900px){.loggrid{grid-template-columns:repeat(2,1fr)}}
@@ -220,6 +221,8 @@ const playerClass=()=>CLASS_OF[G.weapon]||'knight';
 const rankName=()=>L(RANKS[playerClass()][P.form],FORM_NAMES[P.form]);
 // R57/R58: fantasy looks for the piece types (the AI keeps the chess type names internally).
 const ENEMY_LOOK={pawn:'goblin',knight:'skeleton',bishop:'apprentice',rook:'minotaur',queen:'witch',king:'guard'};
+const EXTRA_LOOK={helper:'shopHelper'};   // looks for the Round 5 enemies (ENEMY_LOOK keeps the six R57 types)
+const enemyFig=t=>ENEMY_LOOK[t]||EXTRA_LOOK[t];
 const BOSS_LOOK={pawn:'goblinChief',knight:'evilPrince',bishop:'redMage',rook:'redDragon',queen:'witchQueen',king:'tyrantKing'};
 const WEAPONS={
  sword:{name:'Sword',ico:'⚔',dmg:24,cd:0.36,charge:0.8,desc:'Balanced melee. Quick arcing slashes.',cdesc:'Spin Slash: hits everything around you.'},
@@ -364,6 +367,7 @@ const ETYPES={
  queen:{hp:220,dmg:18,speed:108,r:17,s:15,xp:10,gold:8,score:120},
  king:{hp:400,dmg:22,speed:48,r:19,s:16,xp:15,gold:12,score:200},
  watchtower:{hp:260,dmg:12,speed:0,r:26,s:22,xp:6,gold:6,score:80,static:true},   // floor 5 hostile structure
+ helper:{hp:95,dmg:10,speed:90,r:14,s:13,xp:2,gold:3,score:30},                   // R78 shop helper: a tanky goblin, Merchant fight only
 };
 const SPAWN_W=[
  {pawn:85,knight:15},
@@ -382,6 +386,8 @@ const BOSSES=[
  {type:'king',name:'Checkered King',fname:'Tyrant King',hp:18500,dmg:42,speed:55,r:50,s:54},
 ];
 const bossName=B=>L(B.fname,B.name);
+// R78: the secret Merchant boss (the three merchants riding their cart). Its HP and damage scale with the floor.
+const MERCHANT_BOSS={type:'merchant',name:'The Merchant',fname:'The Merchant',hp:1800,hpF:1500,dmg:14,dmgF:5,speed:80,r:52,s:40};
 const BOSS_ATTACKS={
  pawn:['stomp','summon','ring','march'],
  knight:['leap','leap3','ring','summon'],
@@ -389,6 +395,7 @@ const BOSS_ATTACKS={
  rook:['charge','cannon','plus','summon'],
  queen:['xbeam','plus','leap','spiral','star','summon'],
  king:['quake','summon','star','ring','cannon'],
+ merchant:['ram','helpers','goods','ram'],
 };
 const SUMMONS={pawn:['pawn'],knight:['knight','pawn'],bishop:['bishop','pawn'],rook:['rook','pawn','pawn'],queen:['knight','bishop','pawn'],king:['rook','knight','bishop','pawn']};
 // R84: the spell tiers each boss casts from (index = boss number - 1). The Merchant uses 1-4 (R78).
@@ -531,6 +538,10 @@ const FIG={
   fp([[-0.5,0],[0.5,0],[0.3,-1.3],[-0.3,-1.3]],'#8a5a32');fr(-0.38,-0.75,0.76,0.08,'#3a2410');fd(0.32,-0.62,0.12,'#e0b84f');
   fe(0.05,-1.52,0.27,0.27,'#f0c8a0');fp([[-0.1,-1.42],[0.28,-1.42],[0.1,-1.12]],'#a07050');fd(0.16,-1.56,0.04,'#222');
   fe(0,-1.76,0.58,0.13,'#5a3a1e');fe(0,-1.9,0.3,0.2,'#5a3a1e');fe(0.22,-2.0,0.05,0.16,'#c0392b');},
+ shopHelper(){fr(-0.28,-0.45,0.2,0.45,'#5a3a1e');fr(0.08,-0.45,0.2,0.45,'#5a3a1e');   // R78: a stocky shop helper in an apron
+  fe(0,-0.9,0.5,0.48,'#a0703a');fp([[-0.3,-1.15],[0.32,-1.15],[0.38,-0.45],[-0.36,-0.45]],'#f0e8d0');
+  fe(0.05,-1.5,0.3,0.3,'#f0c8a0');fd(0.17,-1.52,0.045,'#222');fe(0,-1.74,0.36,0.12,'#7a2a1a');fe(0.02,-1.84,0.24,0.14,'#7a2a1a');
+  fl([[0.45,-0.8],[0.85,-1.3]],'#6b4a2a',0.13);fr(0.72,-1.5,0.3,0.24,'#8a5a32');},
  gnome(){fp([[-0.3,0],[0.3,0],[0.2,-0.6],[-0.2,-0.6]],'#3a6ab0');fe(0,-0.75,0.2,0.2,'#f0c8a0');fp([[-0.18,-0.66],[0.2,-0.66],[0.02,-0.4]],'#f4f4f4');
   fp([[-0.24,-0.85],[0.24,-0.85],[0,-1.5]],'#c0392b');},
 };
@@ -876,21 +887,37 @@ function tickDots(e,dt){
  }
  e.dots=e.dots.filter(d=>d.t>0);
 }
+/* ---------- R77 hitting the merchants ---------- */
+// Called by every player damage shape. test(x,y,r) says whether the shape touches a circle there.
+function pokeMerchants(test){
+ const c=G.cart;if(!c||G.merchantFought||G.phase!=='cleared')return;
+ for(const m of c.pawns)if(test(c.x+m.dx,c.y+m.dy,14)){merchantHit();return;}
+}
+function merchantHit(){
+ const c=G.cart;if(c.hitCd>0)return;c.hitCd=0.5;c.hits++;c.hurtT=0.25;G.shake=Math.max(G.shake,4);
+ if(c.hits===1)c.say={txt:'Stop that!',t:0};
+ else if(c.hits===2)c.say={txt:"I'm warning you!",t:0};
+ else spawnMerchantBoss();
+}
 function damageCircle(x,y,r,dmg,o){
+ pokeMerchants((mx,my,mr)=>dist2(x,y,mx,my)<(r+mr)**2);
  o=Object.assign({fx:x,fy:y},o);let n=0;
  for(const e of G.enemies){if(e.dead)continue;const rr=r+e.r;if(dist2(x,y,e.x,e.y)<rr*rr){hitEnemy(e,dmg,o);n++;}}
  return n;
 }
 function damageArc(x,y,a,r,spread,dmg,o){
+ pokeMerchants((mx,my,mr)=>dist2(x,y,mx,my)<(r+mr)**2&&angDiff(Math.atan2(my-y,mx-x),a)<=spread);
  for(const e of G.enemies){if(e.dead)continue;const rr=r+e.r;if(dist2(x,y,e.x,e.y)<rr*rr&&(angDiff(Math.atan2(e.y-y,e.x-x),a)<=spread||dist2(x,y,e.x,e.y)<(e.r+12)**2))hitEnemy(e,dmg,o);}
 }
 // Rectangle starting at (x,y) and extending `len` along angle a, `w` wide (Club slam, R30).
 function damageRect(x,y,a,len,w,dmg,o){
  const ca=Math.cos(a),sa=Math.sin(a);
+ pokeMerchants((mx,my,mr)=>{const dx=mx-x,dy=my-y,f=dx*ca+dy*sa,s=-dx*sa+dy*ca;return f>-mr&&f<len+mr&&Math.abs(s)<w/2+mr;});
  for(const e of G.enemies){if(e.dead)continue;const dx=e.x-x,dy=e.y-y,f=dx*ca+dy*sa,s=-dx*sa+dy*ca;
   if(f>-e.r&&f<len+e.r&&Math.abs(s)<w/2+e.r)hitEnemy(e,dmg,o);}
 }
 function damageLine(ax,ay,bx,by,w,dmg,o){
+ pokeMerchants((mx,my,mr)=>segDist2(mx,my,ax,ay,bx,by)<(w/2+mr)**2);
  for(const e of G.enemies){if(e.dead)continue;const rr=w/2+e.r;if(segDist2(e.x,e.y,ax,ay,bx,by)<rr*rr)hitEnemy(e,dmg,o);}
 }
 function damagePlayer(d,src){
@@ -920,7 +947,7 @@ function killEnemy(e){
  burst(e.x,e.y-e.s,e.boss?80:9,e.boss?'#e0b84f':'#2a2a33',e.boss?2.5:1);
  if(!e.static&&(e.boss||dist2(e.x,e.y,P.x,P.y)<1100*1100)){   // R63 death animation (near the player only)
   if(LOOK==='chess'){if(!e.boss)shatter(e.x,e.y,e.s,'#24242b','#a8a8b8');}
-  else if(G.corpses.length<140)G.corpses.push({fig:e.boss?BOSS_LOOK[e.type]:ENEMY_LOOK[e.type],x:e.x,y:e.y,s:e.s,flip:P.x<e.x,side:P.x<e.x?1:-1,boss:!!e.boss,t:0,dur:e.boss?0.9:0.45});}
+  else if(G.corpses.length<140&&(e.boss?BOSS_LOOK[e.type]:enemyFig(e.type)))G.corpses.push({fig:e.boss?BOSS_LOOK[e.type]:enemyFig(e.type),x:e.x,y:e.y,s:e.s,flip:P.x<e.x,side:P.x<e.x?1:-1,boss:!!e.boss,t:0,dur:e.boss?0.9:0.45});}
  if(e.boss){   // R63: bosses go out with a large burst
   burst(e.x,e.y-e.s,110,'#ffd84a',3.2);burst(e.x,e.y-e.s,50,'#ffffff',2.4);
   if(LOOK==='chess')shatter(e.x,e.y,e.s,'#ece6d6','#151515');
@@ -1322,7 +1349,7 @@ function spawnPos(){
 }
 function rollEnemyType(){const w=SPAWN_W[G.floor-1];let tot=0;for(const k in w)tot+=w[k];let r=Math.random()*tot;for(const k in w){if(r<w[k])return k;r-=w[k];}return 'pawn';}
 function spawnTick(dt){
- if(G.phase==='cleared')return;
+ if(G.phase==='cleared'||G.merchantFight)return;   // no swarm during the Merchant fight (R78)
  const cap=110+25*G.floor,rate=(0.9+0.45*G.floor+G.floorTime*0.018)*(G.phase==='boss'?0.35:1);
  G.spawnAcc+=rate*dt;
  while(G.spawnAcc>=1){G.spawnAcc--;if(G.enemies.length>=cap)break;const p=spawnPos();if(p)spawnEnemy(rollEnemyType(),p.x,p.y);}
@@ -1386,6 +1413,10 @@ const AI={
   if(e.cd2<=0){e.cd2=0.3;for(const o of G.enemies)if(o!==e&&!o.boss&&dist2(o.x,o.y,e.x,e.y)<260*260)o.buffT=0.5;}
  },
 };
+// AI for the Round 5 enemies, kept apart so the six R4 piece behaviours (AI) stay exactly as they were.
+const AI5={
+ helper(e,dt,dx,dy,d,sp){AI.pawn(e,dt,dx,dy,d,sp);},   // R78: the shop helper acts like a goblin
+};
 function updateEnemy(e,dt){
  e.flash-=dt;e.txtCd-=dt;e.slowT-=dt;e.buffT-=dt;e.cd-=dt;e.cd2-=dt;e.weakT-=dt;if(e.despairT>0)e.despairT-=dt;if(e.doomT>0)e.doomT-=dt;if(e.frozenT>0)e.frozenT-=dt;
  if(e.dots.length)tickDots(e,dt);
@@ -1400,7 +1431,7 @@ function updateEnemy(e,dt){
  else{
   const dx=P.x-e.x,dy=P.y-e.y,d=Math.hypot(dx,dy)||1;
   const sp=e.speed*(e.slowT>0?0.5:1)*(e.buffT>0?1.3:1)*(d>1300?2.2:1);
-  AI[e.type](e,dt,dx,dy,d,sp);
+  (AI[e.type]||AI5[e.type])(e,dt,dx,dy,d,sp);
  }
  if(!e.boss&&e.z<8){e.bumped=collideStructures(e);if(e.bumped&&e.stuckT<=0)e.stuckT=0.6;}
  e.x=clamp(e.x,e.r,WORLD-e.r);e.y=clamp(e.y,e.r,WORLD-e.r);
@@ -1456,14 +1487,30 @@ function bossCast(b,id){
   case 'psystrike':for(let k=0;k<3;k++)hc(b.x,b.y,250+100*k,0.8+0.2*k,0.8);break;
  }
 }
+function makeBoss(B,x,y,hp,dmg){
+ const b={boss:true,type:B.type,name:bossName(B),x,y,r:B.r,s:B.s,hp,maxHp:hp,dmg:dmg*diff().dmg,speed:B.speed,dots:[],weakT:0,kx:0,ky:0,slowT:0,stunT:0,buffT:0,stuckT:0,flash:0,txtCd:0,
+  st:'walk',t:0,cd:0,cd2:0,z:0,phase:0,side:1,dead:false,atkT:2.5,busy:0,enraged:false,score:0,xp:0,gold:0,bi:G.floor-1,spellT:BOSS_SPELL_FIRST,castLog:[]};
+ G.enemies.push(b);G.boss=b;G.phase='boss';
+ return b;
+}
 function spawnBoss(){
  const B=BOSSES[G.floor-1],a=rand(0,TAU),hp=B.hp*(1+0.02*(P.level-1))*diff().hp;
  const x=clamp(P.x+Math.cos(a)*650,120,WORLD-120),y=clamp(P.y+Math.sin(a)*650,120,WORLD-120);
- const b={boss:true,type:B.type,name:bossName(B),x,y,r:B.r,s:B.s,hp,maxHp:hp,dmg:B.dmg*diff().dmg,speed:B.speed,dots:[],weakT:0,kx:0,ky:0,slowT:0,stunT:0,buffT:0,stuckT:0,flash:0,txtCd:0,
-  st:'walk',t:0,cd:0,cd2:0,z:0,phase:0,side:1,dead:false,atkT:2.5,busy:0,enraged:false,score:0,xp:0,gold:0,bi:G.floor-1,spellT:BOSS_SPELL_FIRST,castLog:[]};
- G.enemies.push(b);G.boss=b;G.phase='boss';
+ const b=makeBoss(B,x,y,hp,B.dmg);
  banner('The '+b.name+' approaches!','Defeat it to clear Floor '+G.floor);G.shake=12;
  addFx({kind:'ring',x,y,r0:20,r:200,color:'#e0b84f',w:10,dur:0.8});
+}
+// R77/R78: the third hit turns the cart into the Merchant boss. He can be fought once per run (R79).
+function spawnMerchantBoss(){
+ const c=G.cart,B=MERCHANT_BOSS,f=G.floor;
+ const b=makeBoss(B,c.x,c.y,(B.hp+B.hpF*f)*(1+0.02*(P.level-1))*diff().hp,B.dmg+B.dmgF*f);
+ b.spellT=3;G.cart=null;G.merchantFought=true;G.merchantFight=true;
+ banner(L('The Merchant turns on you!','The merchant pawns turn on you!'),"You shouldn't have done that");G.shake=16;
+ poof(c.x,c.y,40);addFx({kind:'ring',x:c.x,y:c.y,r0:20,r:220,color:'#e0b84f',w:10,dur:0.7});
+}
+function spawnHelpers(b,n){
+ for(let k=0;k<n;k++){const a2=k/n*TAU;spawnEnemy('helper',clamp(b.x+Math.cos(a2)*(b.r+40),40,WORLD-40),clamp(b.y+Math.sin(a2)*(b.r+40),40,WORLD-40));}
+ addFx({kind:'ring',x:b.x,y:b.y,r0:20,r:b.r+60,color:'#e0b84f',w:6,dur:0.5});
 }
 function startLeap(b){
  const tx=clamp(P.x,80,WORLD-80),ty=clamp(P.y,80,WORLD-80);
@@ -1484,6 +1531,9 @@ function bossAttack(b,a){
   case 'plus':beamStar(b,0,4,D*1.3);b.busy=1.2;break;
   case 'star':beamStar(b,ang,8,D*1.3);b.busy=1.4;break;
   case 'spiral':b.spiral={t:2.4,acc:0,a:ang,arms:b.enraged?4:3};break;
+  case 'helpers':b.busy=0.6;spawnHelpers(b,3+f);break;   // R78 the Merchant calls his shop helpers
+  case 'goods':b.busy=0.5;fan(b.x,b.y-20,ang,7,0.9,300,D*0.6,'#e0b84f');if(b.enraged)later(0.4,()=>{if(!b.dead)fan(b.x,b.y-20,ang,7,0.9,340,D*0.6,'#e0b84f');});break;   // thrown wares
+  case 'ram':   // R78 the cart rams the player
   case 'charge':hzLine(b.x,b.y,ang,1000,b.r*2,0.8,0);b.busy=0.8;
    later(0.8,()=>{if(!b.dead)b.dash={vx:Math.cos(ang)*1000,vy:Math.sin(ang)*1000,t:1.0};});break;
   case 'cannon':{const n=8+f;for(let k=0;k<n;k++){const a2=rand(0,TAU),rr=rand(0,300);hzCircle(P.x+Math.cos(a2)*rr,P.y+Math.sin(a2)*rr,85,0.8+k*0.08,D);}b.busy=0.5;break;}
@@ -1511,7 +1561,19 @@ function bossUpdate(b,dt){
  const sp=b.speed*(b.enraged?1.2:1)*slow;if(d>b.r+P.r){b.x+=dx/d*sp*dt;b.y+=dy/d*sp*dt;}
  if(b.atkT<=0){b.atkT=rand(2.0,3.0);bossAttack(b,pick(BOSS_ATTACKS[b.type]));}
 }
+// R79: robbing the Merchant. No shop this floor; the next floor starts a few seconds later.
+function onMerchantDown(b){
+ G.boss=null;G.merchantFight=false;G.phase='cleared';G.robbed=true;G.clearT=4;G.cart=null;G.shake=20;
+ for(const e of G.enemies)if(!e.dead){e.dead=true;burst(e.x,e.y-e.s,6,'#2a2a33');}
+ G.eproj=[];G.hazards=[];G.timers=[];G.ezones=[];
+ for(const p of G.pickups){if(p.k==='xp')gainXp(p.v);else P.gold+=p.v;}G.pickups=[];
+ P.gold+=500;G.score+=3000*G.floor;gainXp(10*G.floor);awardBell(G.weapon);
+ for(let k=0;k<26;k++)particle('shard',b.x+rand(-30,30),b.y-30,k%2?'#ffd84a':'#fff4c0',{v:rand(120,360),vy:-rand(100,300),g:500,dur:rand(0.6,1.1),sz:rand(4,8)});
+ floatText(P.x,P.y-60,'+500'+L(' gold',' ◆'),L('#ffd84a','#f4ecd8'),true);
+ banner(L('You robbed the Merchant!','You robbed the merchant pawns!'),'+'+L('500 gold','500 fragments')+' · no shop this floor · onward to Floor '+(G.floor+1));
+}
 function onBossDown(b){
+ if(b.type==='merchant'){onMerchantDown(b);return;}
  G.score+=2500*G.floor;P.gold+=60*G.floor;G.boss=null;G.phase='cleared';G.clearT=3.5;G.cartT=CART_DELAY;G.cart=null;G.shake=26;
  for(const e of G.enemies)if(!e.dead){e.dead=true;burst(e.x,e.y-e.s,6,'#2a2a33');}
  G.eproj=[];G.hazards=[];G.timers=[];G.ezones=[];
@@ -1526,7 +1588,7 @@ function onBossDown(b){
 
 /* ================= FLOOR FLOW ================= */
 function startFloor(){
- G.floorTime=0;G.phase='wave';G.dur=60+15*G.floor;G.spawnAcc=0;G.packT=rand(12,16);
+ G.floorTime=0;G.phase='wave';G.dur=60+15*G.floor;G.merchantFight=false;G.robbed=false;G.spawnAcc=0;G.packT=rand(12,16);
  G.enemies=[];G.pproj=[];G.eproj=[];G.hazards=[];G.pstrikes=[];G.zones=[];G.beams=[];G.orbs=[];G.pickups=[];G.timers=[];G.casts=[];G.cart=null;G.rituals=[];G.ezones=[];
  // every floor is a new board (R19): new layout and colour theme, player back in the centre
  G.theme=themeFor(G.floor);G.structs=genMap(G.floor);G.decor=genDecor(G.floor,G.structs);G.corpses=[];P.x=WORLD/2;P.y=WORLD/2;P.rush=null;P.dashT=0;P.windup=0;
@@ -1556,6 +1618,7 @@ function update(dt){
   if(p.homing){const t=nearestEnemy(p.x,p.y,380);if(t){const cur=Math.atan2(p.vy,p.vx);let dl=(Math.atan2(t.y-p.y,t.x-p.x)-cur)%TAU;
    if(dl>Math.PI)dl-=TAU;if(dl<-Math.PI)dl+=TAU;const na=cur+clamp(dl,-7*dt,7*dt);p.vx=Math.cos(na)*p.spd;p.vy=Math.sin(na)*p.spd;}}
   p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;
+  pokeMerchants((mx,my,mr)=>dist2(p.x,p.y,mx,my)<(p.r+mr)**2);
   for(const e of G.enemies){
    if(e.dead||p.hit.has(e)||e.z>20)continue;const rr=p.r+e.r;
    if(dist2(p.x,p.y,e.x,e.y)<rr*rr){
@@ -1632,7 +1695,9 @@ function update(dt){
  G.shake*=Math.max(0,1-6*dt);
  // floor progress
  if(G.phase==='wave'&&G.floorTime>=G.dur)spawnBoss();
- if(G.phase==='cleared'){if(G.floor>=6){G.clearT-=dt;if(G.clearT<=0)endRun(true);}else updateCart(dt);}
+ if(G.phase==='cleared'){
+  if(G.robbed){G.clearT-=dt;if(G.clearT<=0){G.robbed=false;G.floor++;startFloor();}}   // R79: straight on after the robbery
+  else if(G.floor>=6){G.clearT-=dt;if(G.clearT<=0)endRun(true);}else updateCart(dt);}
  G.enemies=G.enemies.filter(e=>!e.dead);
 }
 // R84: lingering zones from boss spells; they hurt (and may slow) a player standing in them.
@@ -1713,6 +1778,13 @@ function showLogbook(){
 const CROWN_RANK={easy:1,normal:2,hard:3},CROWN_PX={easy:16,normal:24,hard:34},CROWN_COL={easy:'#c98a4a',normal:'#d9dbe8',hard:'#f2c94c'};
 function loadCrowns(){try{return JSON.parse(localStorage.getItem('slaughtermate_crowns')||'{}');}catch(e){return {};}}
 function awardCrown(w,d){const c=loadCrowns();if(!c[w]||CROWN_RANK[d]>CROWN_RANK[c[w]]){c[w]=d;try{localStorage.setItem('slaughtermate_crowns',JSON.stringify(c));}catch(e){}return true;}return false;}
+/* ---------- R79 Merchant bells and R83 Grandmaster crowns ---------- */
+const BELL_SVG='<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="filter:drop-shadow(0 0 1px #000)"><path d="M12 2.2a1.6 1.6 0 0 1 1.6 1.6v.5a6.4 6.4 0 0 1 4.9 6.2v4.6l2 3.1H3.5l2-3.1v-4.6a6.4 6.4 0 0 1 4.9-6.2v-.5A1.6 1.6 0 0 1 12 2.2z" fill="#e0b84f" stroke="#3a2410" stroke-width="1.2"/><path d="M9.4 19.6a2.6 2.6 0 0 0 5.2 0z" fill="#b8860b" stroke="#3a2410" stroke-width="1"/></svg>';
+function loadMarks(k){try{return JSON.parse(localStorage.getItem(k)||'{}');}catch(e){return {};}}
+function saveMark(k,w){const m=loadMarks(k);if(m[w])return false;m[w]=true;try{localStorage.setItem(k,JSON.stringify(m));}catch(e){}return true;}
+const loadBells=()=>loadMarks('slaughtermate_bells'),awardBell=w=>saveMark('slaughtermate_bells',w);
+function marksHTML(w){const b=loadBells()[w];if(!b)return '';
+ return '<span class="marks">'+(b?'<span class="bell" title="Robbed the Merchant">'+BELL_SVG+'</span>':'')+'</span>';}
 function crownHTML(w){const d=loadCrowns()[w];if(!d)return '';
  return '<span class="crown" title="Cleared on '+DIFFICULTY[d].name+'" style="font-size:'+CROWN_PX[d]+'px;color:'+CROWN_COL[d]+'">'+L(iconSVG('grandmaster',CROWN_PX[d],CROWN_COL[d]),'♔')+'</span>';}
 /* ---------- R55/R60/R62 theme switch ---------- */
@@ -1747,7 +1819,7 @@ function showMenu(){
   d.innerHTML=`<h3>${DIFFICULTY[k].name}</h3><p>${DIFF_DESC[k]}</p>`;d.onclick=()=>{selDifficulty=k;showMenu();};db.appendChild(d);}
  const wb=$('weapons');wb.innerHTML='';
  for(const k in WEAPONS){const w=WEAPONS[k],d=document.createElement('div');d.className='card stat'+(k===selWeapon?' sel':'');
-  d.innerHTML=`${crownHTML(k)}<span class="ico">${w.ico}</span><h3>${w.name}</h3><p>${w.desc}</p><p><b>Charged:</b> ${w.cdesc}</p>`;
+  d.innerHTML=`${crownHTML(k)}${marksHTML(k)}<span class="ico">${w.ico}</span><h3>${w.name}</h3><p>${w.desc}</p><p><b>Charged:</b> ${w.cdesc}</p>`;
   d.onclick=()=>{selWeapon=k;showMenu();};wb.appendChild(d);}
  $('menu').classList.remove('hidden');
 }
@@ -1798,13 +1870,13 @@ function equipSpell(id,done){
 // with 3 white pawn merchants. Touching it opens the shop; closing the shop starts the next floor.
 const CART_R=46,CART_DELAY=1;
 function spawnCart(){
- G.cart={x:WORLD/2,y:WORLD/2,t:0,pawns:[{dx:-74,dy:18,ph:0},{dx:76,dy:22,ph:2.1},{dx:6,dy:-62,ph:4.2}]};
+ G.cart={x:WORLD/2,y:WORLD/2,t:0,hits:0,hitCd:0,hurtT:0,say:null,pawns:[{dx:-74,dy:18,ph:0},{dx:76,dy:22,ph:2.1},{dx:6,dy:-62,ph:4.2}]};
  addFx({kind:'ring',x:G.cart.x,y:G.cart.y,r0:10,r:160,color:'#e0b84f',w:8,dur:0.7});glint(G.cart.x,G.cart.y-30,24,1.6,60);
  floatText(G.cart.x,G.cart.y-90,'The merchant cart has arrived!','#e0b84f',true);
 }
 function updateCart(dt){
  if(!G.cart){G.cartT-=dt;if(G.cartT<=0)spawnCart();return;}
- G.cart.t+=dt;
+ G.cart.t+=dt;G.cart.hitCd-=dt;G.cart.hurtT-=dt;if(G.cart.say){G.cart.say.t+=dt;if(G.cart.say.t>2.2)G.cart.say=null;}
  if(dist2(P.x,P.y,G.cart.x,G.cart.y)<(P.r+CART_R)**2)openShop();
 }
 function closeShop(){$('shop').classList.add('hidden');$('replace').classList.add('hidden');G.floor++;startFloor();resume();}
@@ -2036,10 +2108,11 @@ function drawWatchtower(e){
 }
 function drawEnemy(e){
  if(e.type==='watchtower')return drawWatchtower(e);
+ if(e.type==='merchant')return drawMerchantBoss(e);
  const t=G.time;let bob=0,rot=0,ox=0;
  if(e.boss){bob=Math.abs(Math.sin(t*3))*4;rot=Math.sin(t*2)*0.04;if(e.busy>0||e.spiral)ox=(Math.random()-0.5)*4;}
  else switch(e.type){
-  case 'pawn':bob=Math.abs(Math.sin(t*10+e.phase))*4;rot=Math.sin(t*10+e.phase)*0.07;break;
+  case 'pawn':case 'helper':bob=Math.abs(Math.sin(t*10+e.phase))*4;rot=Math.sin(t*10+e.phase)*0.07;break;
   case 'knight':rot=e.st==='hop'?(e.tx<e.fx?-0.3:0.3)*Math.sin(Math.PI*clamp(e.t/e.dur,0,1)):Math.sin(t*5+e.phase)*0.05;break;
   case 'bishop':rot=Math.sin(t*4+e.phase)*0.13;bob=Math.sin(t*4+e.phase)*2+2;break;
   case 'rook':if(e.st==='wind')ox=(Math.random()-0.5)*6;rot=Math.sin(t*6+e.phase)*0.04;break;
@@ -2052,9 +2125,9 @@ function drawEnemy(e){
  if(e.type==='rook'&&e.st==='wind'){ctx.strokeStyle='rgba(255,60,40,.45)';ctx.lineWidth=e.r*2;ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(e.x+Math.sign(e.vx)*500,e.y+Math.sign(e.vy)*500);ctx.stroke();}
  const glow=e.charmT>0?'rgba(255,79,216,.8)':e.frozenT>0?'rgba(190,235,255,.85)':e.despairT>0?'rgba(140,140,140,.8)':e.boss&&e.enraged?'rgba(255,40,40,.75)':e.buffT>0?'rgba(255,215,0,.55)':e.weakT>0?'rgba(255,119,153,.7)':e.slowT>0?'rgba(127,216,255,.65)':e.dashing?'rgba(255,90,60,.6)':e.dots&&e.dots.length?'rgba(190,140,255,.45)':null;
  const charmed=e.charmT>0,frozen=e.frozenT>0;
- if(LOOK==='chess')drawPiece(e.type,e.x+ox,e.y-bob-e.z,e.s,{fill:e.flash>0?'#b83a2e':(e.boss?CHECK:charmed?'#f6eef6':frozen?'#9fd8f0':'#24242b'),stroke:e.boss?'#e0b84f':charmed?'#ff4fd8':frozen?'#e9fbff':'#a8a8b8',lw:e.boss?3:1.5,rot,
+ if(LOOK==='chess')drawPiece(e.type==='helper'?'pawn':e.type,e.x+ox,e.y-bob-e.z,e.s,{fill:e.flash>0?'#b83a2e':(e.boss?CHECK:charmed?'#f6eef6':frozen?'#9fd8f0':e.type==='helper'?'#d8cfb8':'#24242b'),stroke:e.boss?'#e0b84f':charmed?'#ff4fd8':frozen?'#e9fbff':'#a8a8b8',lw:e.boss?3:1.5,rot,
   sx:e.flash>0?1.1:1,sy:e.flash>0?0.9:1,flip:P.x<e.x,glow,eye:e.boss?'#ff3030':'#ff5050'});
- else drawFigure(e.boss?BOSS_LOOK[e.type]:ENEMY_LOOK[e.type],e.x+ox,e.y-bob-e.z,e.s,{tint:e.flash>0?'#e05a48':frozen?'#a8def4':null,rot:e.sleepT>0?0.25:rot,
+ else drawFigure(e.boss?BOSS_LOOK[e.type]:enemyFig(e.type),e.x+ox,e.y-bob-e.z,e.s,{tint:e.flash>0?'#e05a48':frozen?'#a8def4':null,rot:e.sleepT>0?0.25:rot,
   sx:e.flash>0?1.1:1,sy:e.flash>0?0.9:1,flip:P.x<e.x,glow:glow||(e.boss?'rgba(224,184,79,.3)':null),lw:e.boss?2.4:1.3,flap:0.5+0.5*Math.sin(t*5+e.phase)});
  if(e.sleepT>0)for(let k=0;k<3;k++){const q=(t*0.8+k/3)%1;ctx.globalAlpha=1-q;txt('z',e.x+e.s*0.6+q*14,e.y-e.s*2.6-e.z-q*26,10+k*3,'#ffd0f4','center');ctx.globalAlpha=1;}   // R71 asleep
  if(e.charmT>0){ctx.strokeStyle='#ff4fd8';ctx.lineWidth=2;for(let k=0;k<3;k++){const q=G.time*6+k*TAU/3;ctx.beginPath();ctx.arc(e.x+Math.cos(q)*e.s*0.7,e.y-e.s*2.9-bob-e.z+Math.sin(q)*4,2.5,0,TAU);ctx.stroke();}}
@@ -2064,7 +2137,16 @@ function drawCart(){
  const c=G.cart,t=G.time,x=c.x,y=c.y,pop=clamp(c.t/0.4,0.05,1);
  ctx.save();ctx.globalAlpha=0.35+0.25*Math.sin(t*4);ctx.strokeStyle='#e0b84f';ctx.lineWidth=3;ctx.setLineDash([10,8]);ctx.lineDashOffset=-t*30;
  ctx.beginPath();ctx.arc(x,y,CART_R+18,0,TAU);ctx.stroke();ctx.restore();
- ctx.save();ctx.translate(x,y);ctx.scale(pop,pop);
+ drawCartBody(x,y,pop,t,0);
+ for(const p of c.pawns){const b=Math.abs(Math.sin(t*4+p.ph))*4,sw=Math.sin(t*2+p.ph)*0.08,hurt=c.hurtT>0;   // 3 white pawn merchants
+  shadow(x+p.dx,y+p.dy,13,0.28);
+  if(LOOK==='chess')drawPiece('pawn',x+p.dx,y+p.dy-b,13*pop,{fill:hurt?'#ffb0b0':'#f6f2e6',stroke:'#2b2b2b',lw:2,rot:sw,flip:p.dx>0,eye:'#2b2b2b'});
+  else drawFigure('merchant',x+p.dx,y+p.dy-b,13*pop,{rot:sw,flip:p.dx>0,tint:hurt?'#ffb0b0':null});}   // R61 merchants
+ if(c.say)speech(x+c.pawns[0].dx,y+c.pawns[0].dy-44,c.say.txt,Math.min(1,(2.2-c.say.t)/0.3));   // R77 warnings
+}
+// The cart itself, at (x,y). Used by the shop cart and by the Merchant boss (R78), which rocks as it drives.
+function drawCartBody(x,y,pop,t,rock){
+ ctx.save();ctx.translate(x,y);ctx.rotate(rock||0);ctx.scale(pop,pop);
  shadow(0,10,56,0.35);
  for(const wx of [-34,34]){ctx.fillStyle='#3b2618';ctx.beginPath();ctx.arc(wx,2,15,0,TAU);ctx.fill();ctx.strokeStyle='#e0b84f';ctx.lineWidth=2;ctx.stroke();   // wheels
   ctx.beginPath();for(let k=0;k<6;k++){const q=k*TAU/6+Math.sin(t)*0.2;ctx.moveTo(wx,2);ctx.lineTo(wx+Math.cos(q)*13,2+Math.sin(q)*13);}ctx.lineWidth=1.5;ctx.stroke();}
@@ -2076,10 +2158,19 @@ function drawCart(){
  ctx.strokeStyle='#e0b84f';ctx.lineWidth=2;ctx.strokeRect(-60,-80,120,6);
  drawLoot(0,-96+Math.sin(t*3)*4,9,Math.sin(t*2)*0.3);   // floating sign: a gold bar (fantasy) or a fragment (chess)
  ctx.restore();
- for(const p of c.pawns){const b=Math.abs(Math.sin(t*4+p.ph))*4,sw=Math.sin(t*2+p.ph)*0.08;   // 3 white pawn merchants
-  shadow(x+p.dx,y+p.dy,13,0.28);
-  if(LOOK==='chess')drawPiece('pawn',x+p.dx,y+p.dy-b,13*pop,{fill:'#f6f2e6',stroke:'#2b2b2b',lw:2,rot:sw,flip:p.dx>0,eye:'#2b2b2b'});
-  else drawFigure('merchant',x+p.dx,y+p.dy-b,13*pop,{rot:sw,flip:p.dx>0});}   // R61 merchants
+}
+function speech(x,y,s,a){ctx.globalAlpha=clamp(a,0,1);ctx.font='bold 14px Georgia';const w=ctx.measureText(s).width+18;
+ ctx.fillStyle='#fffaf0';ctx.strokeStyle='#1b1209';ctx.lineWidth=2;rr(x-w/2,y-26,w,24,8);ctx.fill();ctx.stroke();
+ ctx.beginPath();ctx.moveTo(x-6,y-3);ctx.lineTo(x,y+7);ctx.lineTo(x+5,y-3);ctx.closePath();ctx.fill();ctx.stroke();
+ ctx.fillStyle='#1b1209';ctx.textAlign='center';ctx.fillText(s,x,y-9);ctx.globalAlpha=1;}
+// R78: the Merchant boss: the three merchants ride their cart and it lurches as it rams.
+function drawMerchantBoss(e){
+ const t=G.time,rock=e.dashing?Math.sin(t*30)*0.06:Math.sin(t*6)*0.03,x=e.x,y=e.y,hurt=e.flash>0;
+ drawCartBody(x,y,1,t,rock);
+ for(const [dx,ph] of [[-30,0],[2,2.1],[32,4.2]]){const b=Math.abs(Math.sin(t*8+ph))*3,px=x+dx,py=y-34-b;
+  if(LOOK==='chess')drawPiece('pawn',px,py,12,{fill:hurt?'#ffb0b0':'#f6f2e6',stroke:'#2b2b2b',lw:2,rot:Math.sin(t*5+ph)*0.15,flip:P.x<x,eye:'#c01010',glow:e.enraged?'rgba(255,40,40,.7)':null});
+  else drawFigure('merchant',px,py,12,{rot:Math.sin(t*5+ph)*0.15,flip:P.x<x,tint:hurt?'#ffb0b0':null,glow:e.enraged?'rgba(255,40,40,.6)':null});}
+ if(e.dashing&&Math.random()<0.5)debris(x,y,1,'#6a4a30',0.6);
 }
 const drawLoot=(x,y,s,rot)=>LOOK==='chess'?drawShard(x,y,s,rot):drawGoldBar(x,y,s,rot);   // R48 / R64
 function drawCorpse(c){   // R63: tipping over, then fading just before the puff

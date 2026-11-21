@@ -81,7 +81,7 @@ test('R78 the Merchant rides the cart, rams the player and calls tanky shop help
   assert.match(atk, /ram/);
   assert.match(atk, /helpers/);
   assert.ok(g.run('ETYPES.helper.hp') > g.run('ETYPES.pawn.hp') * 2, 'shop helpers are tankier than goblins');
-  assert.equal(g.run('AI.helper===AI.pawn||typeof AI.helper==="function"'), true);
+  assert.equal(g.run('typeof AI5.helper==="function"&&!("helper" in AI)'), true);
   g.run("G.enemies=G.enemies.filter(e=>e.boss);bossAttack(G.boss,'helpers');");
   const types = g.run('G.enemies.filter(e=>!e.boss).map(e=>e.type).join()').split(',');
   assert.ok(types.length >= 3 && types.every(t => t === 'helper'), 'only shop helpers: ' + types);
