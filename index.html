@@ -2125,7 +2125,8 @@ const BESTIARY=[
  {id:'boss:merchant',boss:true,f:['The Merchant','Secret boss. Strike a merchant three times... They ram you with their cart and call shop helpers.'],c:['The Merchant','Secret boss. Strike a merchant three times... They ram you with their cart and call bazaar pawns.']},
  {id:'boss:grandmaster',boss:true,f:['The Grandmaster',"Secret final boss of floor 7. A giant eye with checkered hands: rook walls, promotions, suicide charges and Grandmaster spells."],c:['The Grandmaster',"Secret final boss of floor 7. A giant eye with checkered hands: rook walls, promotions, suicide charges and Grandmaster spells."]},
 ];
-BESTIARY.slice(10,16).forEach((b,i)=>{const T=['Stomps, marches and summons goblins.','Leaps at you, sometimes three times in a row.','Fires beams in X shapes and bolt spirals.','Charges, fires cannon salvos and plus-shaped beams.','Every trick: beams, leaps, spirals and summons.','Quakes the ground, summons his army and fires cannons.'][i];b.f[1]+=' '+T;b.c[1]+=' '+T;});
+BESTIARY.slice(10,16).forEach((b,i)=>{const T=['Stomps, marches and summons %s.','Leaps at you, sometimes three times in a row.','Fires beams in X shapes and bolt spirals.','Charges, fires cannon salvos and plus-shaped beams.','Every trick: beams, leaps, spirals and summons.','Quakes the ground, summons his army and fires cannons.'][i];
+ b.f[1]+=' '+T.replace('%s','goblins')+' Casts spells too.';b.c[1]+=' '+T.replace('%s','pawns')+' Casts spells too.';});
 let BEASTS=null;
 function loadBeasts(){if(!BEASTS){try{BEASTS=new Set(JSON.parse(localStorage.getItem('slaughtermate_bestiary')||'[]'));}catch(e){BEASTS=new Set();}}return BEASTS;}
 function unlockBeast(id){const s=loadBeasts();if(s.has(id)||!BESTIARY.some(b=>b.id===id))return false;s.add(id);
@@ -2150,7 +2151,7 @@ function drawBeastPic(cnv){
   else if(k==='boss:merchant'){drawCartBody(42,62,0.62,0,0);if(chess)drawPiece('pawn',42,44,10,{fill:'#f6f2e6',stroke:'#2b2b2b',lw:2,eye:'#c01010'});else drawFigure('merchant',42,44,10,{});}
   else if(k==='checkered')drawPiece('rook',42,76,20,{fill:CHECK,stroke:'#e0b84f',lw:2});
   else if(k==='watchtower')drawWatchtower({x:42,y:78,s:16,flash:0,hp:1,maxHp:1,phase:0});
-  else if(k==='helper'){if(chess)drawPiece('pawn',42,76,20,Object.assign({},dark,{fill:'#d8cfb8'}));else drawFigure('shopHelper',42,78,22,{});}
+  else if(k==='helper'){if(chess)drawPiece('pawn',42,76,20,Object.assign({},dark,{fill:'#d8cfb8',stroke:'#2b2b2b'}));else drawFigure('shopHelper',42,78,22,{});}
   else if(k.startsWith('boss:')){const t=k.slice(5);if(chess)drawPiece(t,42,78,16,{fill:CHECK,stroke:'#e0b84f',lw:2.5,eye:'#ff3030'});else drawFigure(BOSS_LOOK[t],42,80,17,{flap:0.5});}
   else{if(chess)drawPiece(k,42,76,19,dark);else drawFigure(ENEMY_LOOK[k],42,78,21,{});}}
  finally{ctx=old;}
@@ -2524,7 +2525,7 @@ function drawEnemy(e){
  if(e.type==='rook'&&e.st==='wind'){ctx.strokeStyle='rgba(255,60,40,.45)';ctx.lineWidth=e.r*2;ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(e.x+Math.sign(e.vx)*500,e.y+Math.sign(e.vy)*500);ctx.stroke();}
  const glow=e.kamikaze>0?'rgba(255,30,30,.85)':e.charmT>0?'rgba(255,79,216,.8)':e.frozenT>0?'rgba(190,235,255,.85)':e.despairT>0?'rgba(140,140,140,.8)':e.boss&&e.enraged?'rgba(255,40,40,.75)':e.buffT>0?'rgba(255,215,0,.55)':e.weakT>0?'rgba(255,119,153,.7)':e.slowT>0?'rgba(127,216,255,.65)':e.dashing?'rgba(255,90,60,.6)':e.dots&&e.dots.length?'rgba(190,140,255,.45)':null;
  const charmed=e.charmT>0,frozen=e.frozenT>0;
- if(pieceLook())drawPiece(e.type==='helper'?'pawn':e.type,e.x+ox,e.y-bob-e.z,e.s,{fill:e.flash>0?'#b83a2e':(e.boss||e.elite?CHECK:charmed?'#f6eef6':frozen?'#9fd8f0':e.type==='helper'?'#d8cfb8':'#24242b'),stroke:e.boss||e.elite?'#e0b84f':charmed?'#ff4fd8':frozen?'#e9fbff':'#a8a8b8',lw:e.boss?3:1.5,rot,
+ if(pieceLook())drawPiece(e.type==='helper'?'pawn':e.type,e.x+ox,e.y-bob-e.z,e.s,{fill:e.flash>0?'#b83a2e':(e.boss||e.elite?CHECK:charmed?'#f6eef6':frozen?'#9fd8f0':e.type==='helper'?'#d8cfb8':'#24242b'),stroke:e.boss||e.elite?'#e0b84f':e.type==='helper'?'#2b2b2b':charmed?'#ff4fd8':frozen?'#e9fbff':'#a8a8b8',lw:e.boss?3:1.5,rot,
   sx:e.flash>0?1.1:1,sy:e.flash>0?0.9:1,flip:P.x<e.x,glow,eye:e.boss?'#ff3030':'#ff5050'});
  else drawFigure(e.boss?BOSS_LOOK[e.type]:enemyFig(e.type),e.x+ox,e.y-bob-e.z,e.s,{tint:e.flash>0?'#e05a48':frozen?'#a8def4':null,rot:e.sleepT>0?0.25:rot,
   sx:e.flash>0?1.1:1,sy:e.flash>0?0.9:1,flip:P.x<e.x,glow:glow||(e.boss?'rgba(224,184,79,.3)':null),lw:e.boss?2.4:1.3,flap:0.5+0.5*Math.sin(t*5+e.phase)});
