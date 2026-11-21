@@ -10,6 +10,9 @@ Source documents (in this repository):
 - Round 4 requirements: the "==ROUND 4 CHANGES AND ADDITIONS==" section that the user added to
   `handoff-round-3.md`, plus the user's answers to the clarifying questions (marked *Clarified*
   below). There is no `problem.md`.
+- Round 5 requirements: the "==ROUND 5 CHANGES AND ADDITIONS==" section that the user added to
+  `handoff-round-4.md`, plus the user's answers to the clarifying questions (marked *Clarified*
+  below; the user accepted every proposed default except where stated).
 
 Requirement IDs are stable across rounds. Round 1 requirements had no IDs in the source; they were
 numbered R1–R16 in Round 2 so tests can refer to them. A requirement that a later round changes keeps
@@ -311,6 +314,158 @@ source, so it keeps its Round 2 look.
 - **R76** The player gets 2 extra spell slots, for 5 in total. *Clarified:* keys 4 and 5 cast them,
   and all five slots are available from the start.
 
+## Round 5 requirements
+
+*Amended in Round 5:* R5 (6 bosses) and R50 (crowns) still hold. Two optional secret bosses are
+added (R77–R83), and a seventh floor exists only for runs that unlock it (R80, R81). Beating the
+floor 6 boss still wins the run and awards the crown; the floor 7 fight comes after that.
+
+### Secret boss: the Merchant
+
+- **R77** Hitting a merchant at the cart makes him say "Stop that!", a second hit makes him say "I'm
+  warning you!", and the third hit makes the cart disappear and a boss appear. *Clarified:* any
+  player attack or spell that touches a merchant counts, at most one hit per 0.5 s, so a single
+  spell can't skip the warnings.
+- **R78** The Merchant boss is the 3 merchants riding their cart (one boss with one HP bar, scaled
+  to the floor). It attacks and rams the player. A new enemy, the shop helper, spawns only in this
+  fight. It acts like a goblin (pawn) but is tankier. The normal swarm doesn't spawn during the
+  fight. The Merchant casts spells of tiers 1–4 that are heavily weakened (see R84).
+- **R79** Defeating the Merchant robs him of 500 gold. *Clarified:* a banner shows the loot, and
+  the next floor starts a few seconds later with no shop on that floor. He can be fought only once
+  per run (after that, hits do nothing). A bell appears on the start screen's weapon card once the
+  Merchant has been defeated with that weapon. It is saved across runs, for any difficulty, even if
+  that run is later lost.
+
+### Secret final boss: the Grandmaster
+
+- **R80** On floor 3 one grand disciple spawns partway through the wave, hidden in the swarm, with a
+  lot of HP. When he dies he explodes, killing every non-boss enemy around him. When the floor is
+  cleared, the **Grandmaster's Draft** appears where he died. Picking it up costs 30% of max HP
+  (it can't kill) and unlocks floor 7. *Clarified:* if the disciple is still alive when the boss
+  dies, he's gone and no draft appears. His explosion doesn't hurt the player. The item is called
+  "Draft".
+- **R81** Floor 7, **the Grandmaster's Domain**, is a giant black-and-white chessboard. Its enemies
+  are chess pieces in both themes. Larger checkered elite pieces (1.3× size, 2.5× HP) and grand
+  disciples appear in the swarm. *Clarified:* with the draft, beating the floor 6 boss still wins
+  the run and awards the crown, but a **portal** appears instead of the cart (there is no shop).
+  Touching it takes the player to floor 7. Floor 7 has a normal wave timer, then the Grandmaster
+  arrives with about 1.7× the King's HP.
+- **R82** The Grandmaster moves like the other bosses, but his attacks are different:
+  - a wall of checkered rooks sweeps across the screen, dealing heavy damage, and the rooks can be
+    destroyed as they move
+  - he promotes nearby enemies (about 500 px) into rooks or queens, keeping their HP fraction
+  - he enrages the enemies on screen, which charge headfirst at the player at high speed and die
+    on contact, dealing heavy damage
+  - he casts any Grandmaster spell except Hellfire, with a longer wind-up and a slightly smaller
+    area, still dealing heavy damage. His Mental Inversion buffs enemies instead of controlling
+    them.
+- **R83** When defeated, the Grandmaster slowly glows with light and then explodes, which clears
+  the run. An upside-down crown appears on the weapon card once he has been defeated with that
+  weapon (saved across runs, any difficulty).
+
+### Bosses cast spells
+
+- **R84** Bosses cast spells, weaker than the player's. *Clarified:* each spell becomes a telegraphed
+  enemy attack aimed at the player, in the element's look. Bolts become projectiles, novas a ring
+  around the boss, zones, meteors and rain circles at the player, beams lines. Damage comes from the
+  boss's own damage, not the spell's. A boss casts about every 7 s on top of its normal attacks.
+  Freeze, sleep and stun on the player become a short slow (about 40% for 1.5 s). The tiers are:
+
+  | Boss | Spell tiers |
+  |---|---|
+  | 1 Goblin Chief / Iron Pawn | 1 |
+  | 2 Evil Prince / Mad Knight | 1–2 |
+  | 3 Red Mage / Cardinal Bishop | 1–3 |
+  | 4 Red Dragon / Siege Rook | 1–4 |
+  | 5 Witch Queen / Black Queen | 1–5 |
+  | 6 Tyrant King / Checkered King | 4–5 |
+  | Merchant | 1–4, heavily weakened |
+  | Grandmaster | Grandmaster tier, except Hellfire (R82) |
+
+### New additions
+
+- **R85** An enemy logbook on the start screen lists every enemy and boss: the 6 normal types, the
+  floor 5 tower, shop helpers, grand disciples and checkered elites, plus the 6 bosses, the Merchant
+  and the Grandmaster. *Clarified:* it follows the current theme (medieval names and figures, or
+  chess pieces). Each entry shows a drawing, a name and a short description. Entries unlock the
+  first time the enemy is encountered and are saved under `slaughtermate_bestiary`. Locked entries
+  show "???".
+- **R86** The shop sells weapon upgrades for money, from tier 1 (the default) up to tier 5. Every
+  upgrade increases damage. *Clarified:* tiers 2–5 cost 150, 300, 500 and 800 gold. Upgrades last
+  for the run. Each tier adds +20% weapon damage. Perks build on each other unless a tier replaces
+  one. Every weapon follows the same material look as the Sword: tier 2 gold, tier 3 obsidian,
+  tier 4 enchanted, tier 5 mirror.
+- **R87 Sword.**
+  - Tier 2: a larger slash radius, and the charged spin slash spins twice.
+  - Tier 3: a larger slash radius, and the charged attack becomes a wide wave slash.
+  - Tier 4: the basic attack is slower but sweeps a massive area, and the charged attack is a
+    tri-wave slash.
+  - Tier 5: the basic attack is a 3-hit wide slice, and the charged attack is a massive wave beam.
+- **R88 Hammer.**
+  - Tier 2: a bigger smash, and the charged slam slows enemies.
+  - Tier 3: the basic attack releases a weak pulse, and the charged attack becomes a leaping crush.
+  - Tier 4: the same, with more damage.
+  - Tier 5: every enemy the pulse hits releases another pulse. The charged slam destroys the map
+    for a while. *Clarified:* structures in a big radius are flattened (no walls) for about 8 s,
+    then rebuild.
+- **R89 Bow.**
+  - Tier 2: 3 arrows per shot, and the charged attack shoots 3 great arrows.
+  - Tier 3: 5 arrows for both attacks.
+  - Tier 4: arrows pierce enemies, and the charged attack fires 3 massive arrows that stop, then
+    home in on 3 enemies.
+  - Tier 5: 10 arrows for both attacks.
+- **R90 Staff (mage).**
+  - Tier 2: magic bursts set off chain explosions on the enemies they hit, and the charged attack
+    casts a random spell from the player's slots. *Clarified:* it is free and doesn't use the
+    spell's cooldown.
+  - Tier 3: larger chain explosions, and the charged attack also pulls enemies inward.
+  - Tier 4: magic bursts shoot out small orbs that explode. The charged attack is unchanged.
+  - Tier 5: bursts leave pillars of magic that slowly move away from the player, and the charged
+    attack is a giant laser that smites an area.
+- **R91 Scythe.**
+  - Tier 2: basic attacks steal HP, and the charged attack steals twice as much as before.
+  - Tier 3: basic attacks throw a scythe that deals damage, and the charged attack does the same.
+  - Tier 4: basic attacks throw 3 wider scythes, and the charged attack greatly enlarges the
+    scythe and slashes all around the player, dealing damage and stealing HP.
+  - Tier 5: 5 scythes are thrown instead of 3, and the charged attack warps the player to the
+    cursor and deals large slices there that steal HP.
+- **R92 Club.**
+  - Tier 2: a larger area and bigger explosions.
+  - Tier 3: the basic attack becomes chain explosions, and the charged attack is a long line of
+    bursts that travels far.
+  - Tier 4: explosions push enemies away, and the charged attack also weakens enemies.
+  - Tier 5: the basic attack sets off many explosions in a wide cone, and the charged attack lets
+    the player double-wield. *Clarified:* for 8 s every basic attack strikes twice.
+- **R93 Shield.**
+  - Tier 2: the dash goes farther, and the charged rush pushes enemies further.
+  - Tier 3: ranged damage taken is reduced, and the dash gives a shield around the player for
+    5 s. *Clarified:* enemy projectiles deal 30% less, and the dash shield absorbs up to 25% of
+    max HP.
+  - Tier 4: the dash has a wind force that pushes enemies away, and the charged rush makes the
+    shield last longer.
+  - Tier 5: a stronger wind force. The dash becomes a great charge that drags enemies along over a
+    wide area, and the shield is bigger.
+- **R94 Tome.**
+  - Tier 2: more spirits on the basic attack, and the charged spirits home in on enemies.
+  - Tier 3: spirits lock on to an enemy and follow it, and the charged attack releases more
+    spirits.
+  - Tier 4: spirits stop, then fly at an enemy and explode, for both attacks.
+  - Tier 5: spirit explosions leave a small damaging area for 3 s. Charged spirits leave a longer
+    lasting area.
+
+### Slight changes
+
+- **R95** The cursor is easier to see: a black bullseye. *Clarified:* it has a thin white outline
+  so it stays visible on the dark floors, and it is used over the game canvas in both themes.
+- **R96** The Grandmaster is a giant eye with 2 large floating checkered hands and a checkered crown
+  halo above him. Grand disciples are the eye alone. *Clarified:* the same design is used in both
+  themes.
+- **R97** On the start screen the player can upload an image from their computer, and it becomes
+  the face of the Grandmaster and the grand disciples. *Clarified:* the image replaces the entire
+  eye, so it is easy to see. It is shrunk to 128 px and saved under `slaughtermate_face`, and it
+  can be removed again. For the visual check, images are picked at random from the user's
+  "Reaction images" folder.
+
 ## Testing
 
 - Tests run with Node's built-in runner (`npm test` or `node --test tests/`), with no dependencies.
@@ -319,5 +474,6 @@ source, so it keeps its Round 2 look.
 - Every test name starts with the requirement ID it checks. Round 1 regression tests (R1–R16) live in
   `tests/round1.test.js`, Round 2 tests (R17–R35) in `tests/round2.test.js`, and Round 3 tests
   (R36–R54) in `tests/round3.test.js`. Round 4 tests (R55–R76) are in `tests/round4.test.js`.
+  Round 5 tests (R77–R97) are in `tests/round5.test.js`.
 - Older tests that check the chess look switch to the chess theme first. Each of these changes
   carries an "Amended in Round 4" comment.
