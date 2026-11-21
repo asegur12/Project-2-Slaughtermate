@@ -665,7 +665,7 @@ test('R92 Club tiers: bigger slam, chain explosions, a long line of bursts, knoc
   assert.ok(g.run('G.clubBlasts') >= 8, 'tier 3 charged is a long line of bursts');
   assert.ok(lost(g, 'line') > 0, 'that travels far');
   g.run('G.enemies=[];'); dummyAt(g, 110, 0, 'kb');
-  ready(g, 4); g.run('chargedAttack();'); g.step(0.6);
+  ready(g, 4); g.run('chargedAttack();'); g.step(1.2);
   assert.ok(g.run('kb.weakT') > 0, 'tier 4 charged weakens');
   g.run('G.enemies=[];'); dummyAt(g, 110, 0, 'kb2');
   ready(g, 4); g.run('basicAttack();'); g.step(0.3);
@@ -694,12 +694,12 @@ test('R93 Shield tiers: farther dash, less ranged damage, a dash shield, wind fo
   assert.ok(Math.abs(hitBy(3) / hitBy(1) - 0.7) < 0.01, 'tier 3 takes 30% less ranged damage');
   g.run('P.shield=0;P.shieldT=0;'); dashBy(g, 3);
   assert.ok(g.run('P.shield') >= g.run('P.maxHp') * 0.25 - 1 && g.run('P.shieldT') > 4, 'tier 3 dash gives a shield for 5 s');
-  g.run('G.enemies=[];'); g.aimAt(g.run('P.x') + 400, g.run('P.y')); dummyAt(g, 0, 110, 'wind');
+  g.run('G.enemies=[];P.x=P.y=1600;'); g.aimAt(g.run('P.x') + 400, g.run('P.y')); dummyAt(g, 0, 110, 'wind');
   g.run('wind.stunT=0;'); dashBy(g, 4);
   assert.ok(g.run('Math.abs(wind.y-P.y)') > 150 || g.run('wind.x') < g.run('P.x') - 50, 'tier 4 dash wind pushes enemies away');
   ready(g, 4); g.run('P.shieldT=2;chargedAttack();'); g.step(0.4);
   assert.ok(g.run('P.shieldT') > 4, 'tier 4 charged extends the shield');
-  g.run('G.enemies=[];'); dummyAt(g, 60, 0, 'drag');
+  g.run('G.enemies=[];P.x=P.y=1600;'); dummyAt(g, 60, 0, 'drag');
   const x0 = g.run('drag.x'); dashBy(g, 5);
   assert.ok(g.run('drag.x') - x0 > 120, 'tier 5 dash drags enemies along');
   assert.ok(g.run('shieldRadius()') > 30, 'bigger shield');

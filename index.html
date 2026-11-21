@@ -778,13 +778,13 @@ function makeState(){
  const S=genMap(1);
  return {state:'menu',time:0,runTime:0,floor:1,floorTime:0,phase:'wave',dur:75,enemies:[],pproj:[],eproj:[],hazards:[],pstrikes:[],zones:[],beams:[],orbs:[],
   pickups:[],fx:[],parts:[],texts:[],timers:[],casts:[],dealt:0,structs:S,decor:genDecor(1,S),corpses:[],theme:themeFor(1),difficulty:'normal',clubBlasts:0,shake:0,score:0,kills:0,pity:0,bags:{1:[],2:[],3:[],4:[],5:[],6:[]},statBag:[],
-  ezones:[],hasDraft:false,draft:null,draftAt:null,portal:null,discipleDone:false,merchantFought:false,kingSlain:false,gmSlain:false,pendingLevels:0,spawnAcc:0,packT:16,banner:null,boss:null,weapon:'sword',clearT:0,shop:null,cart:null,cartT:0,rituals:[],gmPity:0,screenFlash:null};
+  ezones:[],pulses:[],mpillars:[],hasDraft:false,draft:null,draftAt:null,portal:null,discipleDone:false,merchantFought:false,kingSlain:false,gmSlain:false,pendingLevels:0,spawnAcc:0,packT:16,banner:null,boss:null,weapon:'sword',clearT:0,shop:null,cart:null,cartT:0,rituals:[],gmPity:0,screenFlash:null};
 }
 function xpFor(l){return Math.floor(6+l*3.5+l*l*0.15);}
 function makePlayer(w){
  const p={x:WORLD/2,y:WORLD/2,r:15,hp:100,maxHp:100,speed:230,form:0,level:1,xp:0,xpNext:xpFor(1),gold:0,dmgMult:1,spellMult:1,cdMult:1,atkSpeed:1,
   armor:0,crit:0.05,magnet:110,regen:0,shield:0,shieldT:0,iframes:0,hurt:0,atkCd:0,holdT:0,charge:0,charging:false,aim:0,swingT:0,moving:false,spells:[null,null,null,null,null],
-  dashCd:0,dashT:0,dashA:0,rush:null,windup:0,windA:0,bashT:0,bashA:0,slowT:0};
+  dashCd:0,dashT:0,dashA:0,rush:null,windup:0,windA:0,bashT:0,bashA:0,slowT:0,wtier:1,dualT:0,leap:null,z:0};
  if(w==='staff')p.spellMult+=0.1;
  if(w==='hammer'){p.maxHp+=20;p.hp+=20;}
  if(w==='shield')p.armor+=0.1;
@@ -915,6 +915,7 @@ function hitEnemy(e,dmg,o){
  e.hp-=dmg;if(!o.tick)e.flash=0.1;
  if(o.dot)applyDot(e,o.dot[0],o.dot[1],o.dotKey||'dot',o.dotCol,o.dotEl);
  if(o.weak)e.weakT=Math.max(e.weakT,o.weak);
+ if(o.steal&&dealt>0)P.hp=Math.min(P.maxHp,P.hp+dealt*o.steal);   // R91 scythe life steal
  if(e.txtCd<=0||crit){floatText(e.x,e.y-e.s*2.4-e.z,Math.round(dmg),crit?'#ffd23f':(e.boss?'#ffb0b0':'#ffffff'),crit);e.txtCd=0.18;}
  if(!e.boss&&!e.static){
   if(o.knock){const fx=o.fx??P.x,fy=o.fy??P.y,a=Math.atan2(e.y-fy,e.x-fx);e.kx+=Math.cos(a)*o.knock*7;e.ky+=Math.sin(a)*o.knock*7;}
@@ -1107,75 +1108,175 @@ function gainXp(v){
 }
 
 /* ================= PLAYER ATTACKS ================= */
+/* ---------- R86-R94 weapon tiers ---------- */
+// Tier 1 is each weapon's Round 1/2 behaviour. Tiers 2-5 are bought at the cart; every tier adds +20% damage,
+// and perks build on each other unless a tier replaces one. Materials (and colours): gold, obsidian, enchanted, mirror.
+const WEAPON_UP_PRICE=[0,0,150,300,500,800];
+const WEAPON_MAT=['','','Gold','Obsidian','Enchanted','Mirror'];
+const WT_COL=[null,null,'#f2c94c','#4a3a5a','#b48cff','#eef8ff'];
+const weaponTierName=(w,t)=>(t>1?WEAPON_MAT[t]+' ':'')+WEAPONS[w].name;
+const wdmg=()=>WEAPONS[G.weapon].dmg*P.dmgMult*(1+0.2*((P.wtier||1)-1));
+const WEAPON_PERKS={
+ sword:[,,'Larger slashes, and the spin slash spins twice.','Larger slashes; the charged attack becomes a wide wave slash.','Slower slashes that sweep a massive area; a tri-wave charged slash.','A 3-hit wide slice; the charged attack is a massive wave beam.'],
+ hammer:[,,'A bigger smash; the charged slam slows enemies.','Smashes release a pulse; the charged attack is a leaping crush.','Stronger pulses and a heavier leaping crush.','Every enemy a pulse hits pulses again; the crush flattens the map for a while.'],
+ bow:[,,'3 arrows per shot; the charged attack fires 3 great arrows.','5 arrows for both attacks.','Arrows pierce; 3 massive arrows stop, then home in on 3 enemies.','10 arrows for both attacks.'],
+ staff:[,,'Bursts set off chain explosions; the charged attack casts a random slot spell for free.','Larger chain explosions; the charged attack also pulls enemies in.','Bursts shoot out small exploding orbs.','Bursts leave drifting pillars of magic; the charged attack is a giant laser.'],
+ scythe:[,,'Basic attacks steal HP; the charged reap steals twice as much.','Both attacks also throw a scythe.','3 wider thrown scythes; the charged attack is a giant slash all around you.','5 thrown scythes; the charged attack warps you to the cursor for large slices.'],
+ club:[,,'A larger slam and bigger explosions.','The slam becomes chain explosions; the charged attack is a long line of bursts.','Explosions push enemies away; the charged bursts also weaken.','Many explosions in a wide cone; the charged attack lets you double-wield.'],
+ shield:[,,'A longer dash; the charged rush pushes enemies further.','30% less ranged damage; dashing gives a 5 s shield.','Your dash blows enemies away; the charged rush extends the shield.','A stronger wind; the dash is a great charge that drags enemies along, and a bigger shield.'],
+ tome:[,,'5 spirits; charged spirits home in on enemies.','Spirits lock on to an enemy; the charged attack releases more spirits.','Spirits stop, then fly at an enemy and explode.','Spirit explosions leave a damaging area (charged: longer).'],
+};
 function releaseAttack(){
- if(P.windup>0||P.rush){P.charging=false;P.charge=0;return;}   // busy with a club wind-up or shield rush
+ if(P.windup>0||P.rush||P.leap){P.charging=false;P.charge=0;return;}   // busy with a club wind-up, shield rush or hammer leap
  if(P.holdT>0.2&&P.charge>=1)chargedAttack();
  else if(P.atkCd<=0)basicAttack();
  P.charging=false;P.charge=0;
 }
 function basicAttack(){
- const w=WEAPONS[G.weapon],dmg=w.dmg*P.dmgMult,a=P.aim,ca=Math.cos(a),sa=Math.sin(a);
- P.atkCd=w.cd/P.atkSpeed;P.swingT=0.15;
+ const w=WEAPONS[G.weapon],T=P.wtier||1;
+ P.atkCd=w.cd/P.atkSpeed*(G.weapon==='sword'&&T>=4?1.5:1);P.swingT=0.15;
+ basicStrike(P.aim,wdmg(),T);
+ if(G.weapon==='club'&&P.dualT>0){const a=P.aim+0.15;later(0.12,()=>basicStrike(a,wdmg(),T));}   // R92 double-wield: every attack strikes twice
+}
+function basicStrike(a,dmg,T){
+ const ca=Math.cos(a),sa=Math.sin(a),mc=WT_COL[T]||'#ffffff';
  switch(G.weapon){
-  case 'sword':damageArc(P.x,P.y,a,100,1.1,dmg,{knock:25,fx:P.x,fy:P.y});
-   addFx({kind:'arc',x:P.x,y:P.y-12,r:85,a,spread:1.1,color:'#ffffff',w:7,dur:0.16});break;
-  case 'bow':G.pproj.push({x:P.x,y:P.y,vx:ca*950,vy:sa*950,r:6,dmg,life:0.9,pierce:1,hit:new Set(),explode:0,kind:'arrow',color:'#ffffff'});break;
+  case 'sword':{const r=[0,100,130,150,220,220][T],sp=T>=5?1.6:T>=4?1.5:1.1;   // R87
+   const slash=()=>{damageArc(P.x,P.y,a,r,sp,dmg,{knock:25,fx:P.x,fy:P.y});addFx({kind:'arc',x:P.x,y:P.y-12,r:r*0.85,a,spread:sp,color:mc,w:T>=4?11:7,dur:0.16});};
+   slash();if(T>=5){later(0.1,slash);later(0.2,slash);}break;}
+  case 'bow':{const n=[0,1,3,5,5,10][T],spr=n===1?0:n<=3?0.18:n<=5?0.36:0.7;   // R89
+   for(let k=0;k<n;k++){const b=a+(n>1?(k/(n-1)-0.5)*spr:0);
+    G.pproj.push({x:P.x,y:P.y,vx:Math.cos(b)*950,vy:Math.sin(b)*950,r:6,dmg,life:0.9,pierce:T>=4?3:1,hit:new Set(),explode:0,kind:'arrow',color:T>=2?mc:'#ffffff'});}break;}
   case 'staff':{const m=mouseWorld(),d=clamp(Math.hypot(m.x-P.x,m.y-P.y),80,650);
-   G.pproj.push({x:P.x,y:P.y,vx:ca*560,vy:sa*560,r:9,dmg,life:d/560,pierce:0,hit:new Set(),explode:70,kind:'orb',color:'#c77dff'});break;}
-  case 'hammer':{const cx=P.x+ca*55,cy=P.y+sa*55;damageCircle(cx,cy,72,dmg,{knock:55,fx:P.x,fy:P.y});
-   addFx({kind:'ring',x:cx,y:cy,r0:20,r:75,color:'#e8d0a0',w:6,dur:0.25});burst(cx,cy,8,'#a08060');G.shake=Math.max(G.shake,3);break;}
-  case 'scythe':damageArc(P.x,P.y,a,110,Math.PI/2,dmg,{knock:20,fx:P.x,fy:P.y});   // a full semicircle in front (R28)
-   addFx({kind:'arc',x:P.x,y:P.y-12,r:95,a,spread:Math.PI/2,color:'#d8d0ff',w:6,dur:0.2});
-   for(let k=0;k<6;k++){const b=a+rand(-1.5,1.5);particle('spark',P.x+Math.cos(b)*95,P.y-12+Math.sin(b)*95,'#e8e0ff',{a:b,v:60,dur:0.3});}break;
+   G.pproj.push({x:P.x,y:P.y,vx:ca*560,vy:sa*560,r:9,dmg,life:d/560,pierce:0,hit:new Set(),explode:70,kind:'orb',color:T>=2?mc:'#c77dff'});break;}
+  case 'hammer':{const cx=P.x+ca*55,cy=P.y+sa*55,r=T>=2?95:72;damageCircle(cx,cy,r,dmg,{knock:55,fx:P.x,fy:P.y});   // R88
+   addFx({kind:'ring',x:cx,y:cy,r0:20,r:r+3,color:T>=2?mc:'#e8d0a0',w:6,dur:0.25});burst(cx,cy,8,'#a08060');G.shake=Math.max(G.shake,3);
+   if(T>=3)addPulse(cx,cy,260,dmg*(T>=4?0.55:0.4),0);break;}
+  case 'scythe':{const st=T>=2?{steal:0.06}:{};   // R91
+   damageArc(P.x,P.y,a,110,Math.PI/2,dmg,Object.assign({knock:20,fx:P.x,fy:P.y},st));   // a full semicircle in front (R28)
+   addFx({kind:'arc',x:P.x,y:P.y-12,r:95,a,spread:Math.PI/2,color:T>=2?mc:'#d8d0ff',w:6,dur:0.2});
+   for(let k=0;k<6;k++){const b=a+rand(-1.5,1.5);particle('spark',P.x+Math.cos(b)*95,P.y-12+Math.sin(b)*95,'#e8e0ff',{a:b,v:60,dur:0.3});}
+   if(T>=3){const n=T>=5?5:T>=4?3:1,spr=T>=5?1.2:0.7;for(let k=0;k<n;k++)throwScythe(a+(n>1?(k/(n-1)-0.5)*spr:0),dmg*0.8,T>=4?24:16,st);}break;}
   case 'shield':damageArc(P.x,P.y,a,62,0.8,dmg,{knock:90,fx:P.x,fy:P.y});P.bashT=0.12;P.bashA=a;   // bash and step in (R29)
-   addFx({kind:'ring',x:P.x+ca*40,y:P.y+sa*40-10,r0:8,r:40,color:'#e0b84f',w:5,dur:0.2});debris(P.x+ca*45,P.y+sa*45,4,'#8a7050',0.6);break;
-  case 'club':damageRect(P.x,P.y,a,150,70,dmg,{knock:40,fx:P.x,fy:P.y});   // rectangular slam (R30)
-   addFx({kind:'rect',x:P.x,y:P.y,a,len:150,w:70,color:'#e8c890',dur:0.25});debris(P.x+ca*130,P.y+sa*130,6,'#8a6a40',0.8);G.shake=Math.max(G.shake,3);break;
-  case 'tome':for(let k=-1;k<=1;k++)spirit(a+k*0.14,dmg,0.9);break;   // three piercing spirits (R31)
+   addFx({kind:'ring',x:P.x+ca*40,y:P.y+sa*40-10,r0:8,r:40,color:T>=2?mc:'#e0b84f',w:5,dur:0.2});debris(P.x+ca*45,P.y+sa*45,4,'#8a7050',0.6);break;
+  case 'club':   // R92
+   if(T>=5){for(let i=0;i<9;i++){const g=Math.floor(i/3),b=a+((i%3)-1)*0.45,d2=100+g*100;later(g*0.1,()=>clubBlast(P.x+Math.cos(b)*d2,P.y+Math.sin(b)*d2,65,dmg*0.7,T));}}
+   else if(T>=3){for(let k=0;k<3;k++){const d2=70*(k+1);later(k*0.08,()=>clubBlast(P.x+ca*d2,P.y+sa*d2,65,dmg*0.8,T));}}
+   else{const len=T>=2?190:150,wd=T>=2?95:70;damageRect(P.x,P.y,a,len,wd,dmg,{knock:40,fx:P.x,fy:P.y});   // rectangular slam (R30)
+    addFx({kind:'rect',x:P.x,y:P.y,a,len,w:wd,color:T>=2?mc:'#e8c890',dur:0.25});debris(P.x+ca*(len-20),P.y+sa*(len-20),6,'#8a6a40',0.8);G.shake=Math.max(G.shake,3);}
+   break;
+  case 'tome':{const n=T>=2?5:3;for(let k=0;k<n;k++)spirit(a+(k-(n-1)/2)*0.14,dmg,0.9,T,false);break;}   // piercing spirits (R31, R94)
  }
 }
 function chargedAttack(){
- const w=WEAPONS[G.weapon],dmg=w.dmg*P.dmgMult,a=P.aim,ca=Math.cos(a),sa=Math.sin(a);
+ const w=WEAPONS[G.weapon],dmg=wdmg(),T=P.wtier||1,a=P.aim,ca=Math.cos(a),sa=Math.sin(a),mc=WT_COL[T]||'#ffffff';
  P.atkCd=w.cd/P.atkSpeed;P.swingT=0.3;
  switch(G.weapon){
-  case 'sword':damageCircle(P.x,P.y,175,dmg*3.2,{knock:70});
-   addFx({kind:'spin',x:P.x,y:P.y-12,r:160,color:'#ffffff',dur:0.35});burst(P.x,P.y,20,'#dfe6f0',1.5);G.shake=Math.max(G.shake,6);break;
-  case 'bow':G.pproj.push({x:P.x,y:P.y,vx:ca*1150,vy:sa*1150,r:22,dmg:dmg*4.5,life:1.4,pierce:999,knock:50,hit:new Set(),explode:0,kind:'bigarrow',color:'#e0b84f'});G.shake=Math.max(G.shake,4);break;
-  case 'staff':{const m=mouseWorld();let tx=m.x,ty=m.y;const d=Math.hypot(tx-P.x,ty-P.y);if(d>550){tx=P.x+ca*550;ty=P.y+sa*550;}
-   damageCircle(tx,ty,200,dmg*5.5,{knock:40});addFx({kind:'flash',x:tx,y:ty,r:200,color:'#c77dff',dur:0.35});
-   addFx({kind:'ring',x:tx,y:ty,r0:20,r:210,color:'#ffffff',w:8,dur:0.4});burst(tx,ty,30,'#c77dff',2);G.shake=Math.max(G.shake,9);break;}
-  case 'hammer':damageCircle(P.x,P.y,250,dmg*3.6,{knock:110,stun:1.2});
-   for(let i=0;i<3;i++)addFx({kind:'ring',x:P.x,y:P.y,r0:20,r:250+i*20,color:i?'#c09060':'#ffffff',w:10-i*3,dur:0.4+i*0.1});
-   burst(P.x,P.y,35,'#a08060',2.2);G.shake=Math.max(G.shake,15);break;
-  case 'scythe':{G.dealt=0;damageArc(P.x,P.y,a,170,Math.PI*0.6,dmg*3.4,{knock:60,fx:P.x,fy:P.y});   // crude reap steals HP
-   const heal=Math.min(G.dealt*0.25,P.maxHp*0.25);if(heal>0){P.hp=Math.min(P.maxHp,P.hp+heal);floatText(P.x,P.y-55,'+'+Math.round(heal),'#ff6b8a',true);}
-   addFx({kind:'arc',x:P.x,y:P.y-12,r:155,a,spread:Math.PI*0.6,color:'#b0102a',w:16,dur:0.3});addFx({kind:'arc',x:P.x,y:P.y-12,r:150,a,spread:Math.PI*0.6,color:'#ffd0d8',w:4,dur:0.25});
-   for(let k=0;k<16;k++){const b=a+rand(-1.8,1.8),r=rand(60,160);particle('spark',P.x+Math.cos(b)*r,P.y-12+Math.sin(b)*r,'#ff4060',{a:b+Math.PI,v:r*2.5,dur:0.35});}
+  case 'sword':   // R87
+   if(T>=5){const bx=P.x+ca*1200,by=P.y+sa*1200;damageLine(P.x,P.y,bx,by,220,dmg*6,{knock:60,fx:P.x,fy:P.y});   // a massive wave beam
+    addFx({kind:'beam',ax:P.x,ay:P.y-14,bx,by:by-14,w:220,color:'#cfe8ff',dur:0.5});addFx({kind:'beam',ax:P.x,ay:P.y-14,bx,by:by-14,w:70,color:'#ffffff',dur:0.4});
+    for(let k=0;k<24;k++){const f=Math.random();glint(P.x+(bx-P.x)*f,P.y-14+(by-P.y)*f,1,2,60);}G.shake=Math.max(G.shake,14);}
+   else if(T>=3){const n=T>=4?3:1;for(let k=0;k<n;k++)swordWave(a+(n>1?(k-1)*0.35:0),dmg*3.6,mc);G.shake=Math.max(G.shake,7);}
+   else{const r=T>=2?200:175,spin=()=>{damageCircle(P.x,P.y,r,dmg*3.2,{knock:70});addFx({kind:'spin',x:P.x,y:P.y-12,r:r-15,color:mc,dur:0.35});burst(P.x,P.y,20,'#dfe6f0',1.5);G.shake=Math.max(G.shake,6);};
+    spin();if(T>=2)later(0.25,spin);}
+   break;
+  case 'bow':{const n=[0,1,3,5,3,10][T];   // R89
+   if(T>=4){const spr=T>=5?1.2:0.4;for(let k=0;k<n;k++){const b=a+(k/(n-1)-0.5)*spr;   // massive arrows that stop, then home in
+     G.pproj.push({x:P.x,y:P.y,vx:Math.cos(b)*1150,vy:Math.sin(b)*1150,v0x:Math.cos(b),v0y:Math.sin(b),r:28,dmg:dmg*5.5,life:2.6,pierce:999,knock:50,hit:new Set(),explode:0,kind:'bigarrow',color:mc,home:true,age:0});}}
+   else{const spr=n>3?0.3:n>1?0.16:0;for(let k=0;k<n;k++){const b=a+(n>1?(k/(n-1)-0.5)*spr:0);
+     G.pproj.push({x:P.x,y:P.y,vx:Math.cos(b)*1150,vy:Math.sin(b)*1150,r:22,dmg:dmg*4.5,life:1.4,pierce:999,knock:50,hit:new Set(),explode:0,kind:'bigarrow',color:T>=2?mc:'#e0b84f'});}}
+   G.shake=Math.max(G.shake,4);break;}
+  case 'staff':{const m=mouseWorld();let tx=m.x,ty=m.y;const d=Math.hypot(tx-P.x,ty-P.y);if(d>550){tx=P.x+ca*550;ty=P.y+sa*550;}   // R90
+   if(T>=5){G.pstrikes.push({x:tx,y:ty,r:260,dmg:dmg*8,t:0,delay:0.45,color:'#c77dff',el:'arcane',big:true,laser:true,knock:50,o:{}});G.shake=Math.max(G.shake,10);break;}   // a giant laser
+   const pool=T>=2?P.spells.filter(s=>s&&SPELL_BY_ID[s.id].tier<6):[];
+   if(pool.length){const s=pick(pool),sd=SPELL_BY_ID[s.id];fireSpell(sd,s.lvl);floatText(P.x,P.y-60,sd.name,EL_COL[sd.el]);}   // a random slot spell, free
+   else{damageCircle(tx,ty,200,dmg*5.5,{knock:40});addFx({kind:'flash',x:tx,y:ty,r:200,color:'#c77dff',dur:0.35});
+    addFx({kind:'ring',x:tx,y:ty,r0:20,r:210,color:'#ffffff',w:8,dur:0.4});burst(tx,ty,30,'#c77dff',2);G.shake=Math.max(G.shake,9);}
+   if(T>=3)G.zones.push({x:tx,y:ty,r:340,dps:0,t:0.7,dur:0.7,tick:0,color:'#c77dff',el:'arcane',tier:1,pull:520,nodmg:true,o:{}});   // and pulls enemies in
+   break;}
+  case 'hammer':   // R88
+   if(T>=3){const m=mouseWorld();let tx=m.x,ty=m.y;const d=Math.hypot(tx-P.x,ty-P.y);if(d>450){tx=P.x+(tx-P.x)/d*450;ty=P.y+(ty-P.y)/d*450;}
+    P.leap={fx:P.x,fy:P.y,tx:clamp(tx,P.r,WORLD-P.r),ty:clamp(ty,P.r,WORLD-P.r),t:0,dur:0.45,dmg,T};P.iframes=Math.max(P.iframes,0.55);break;}   // a leaping crush
+   hammerSlam(P.x,P.y,dmg,T);break;
+  case 'scythe':{const steal=T>=2?0.5:0.25;   // R91
+   if(T>=5){const m=mouseWorld();let tx=m.x,ty=m.y;const d=Math.hypot(tx-P.x,ty-P.y);if(d>600){tx=P.x+(tx-P.x)/d*600;ty=P.y+(ty-P.y)/d*600;}   // warp to the cursor
+    addFx({kind:'ghost',x:P.x,y:P.y,form:FORMS[P.form],dur:0.4});P.x=clamp(tx,P.r,WORLD-P.r);P.y=clamp(ty,P.r,WORLD-P.r);P.iframes=Math.max(P.iframes,0.5);
+    for(let k=0;k<3;k++)later(k*0.12,()=>{damageCircle(P.x,P.y,220,dmg*2.4,{knock:40,steal,fx:P.x,fy:P.y});
+     addFx({kind:'arc',x:P.x,y:P.y-12,r:200,a:a+k*2.1,spread:Math.PI*0.8,color:'#b0102a',w:16,dur:0.3});addFx({kind:'arc',x:P.x,y:P.y-12,r:195,a:a+k*2.1,spread:Math.PI*0.8,color:'#ffd0d8',w:4,dur:0.25});G.shake=Math.max(G.shake,7);});}
+   else if(T>=4){damageCircle(P.x,P.y,260,dmg*4,{knock:70,steal,fx:P.x,fy:P.y});   // the scythe grows and slashes all around
+    addFx({kind:'spin',x:P.x,y:P.y-12,r:240,color:'#b0102a',dur:0.4});addFx({kind:'spin',x:P.x,y:P.y-12,r:232,color:'#ffd0d8',dur:0.35});}
+   else{G.dealt=0;damageArc(P.x,P.y,a,170,Math.PI*0.6,dmg*3.4,{knock:60,fx:P.x,fy:P.y});   // crude reap steals HP
+    const heal=Math.min(G.dealt*steal,P.maxHp*steal);if(heal>0){P.hp=Math.min(P.maxHp,P.hp+heal);floatText(P.x,P.y-55,'+'+Math.round(heal),'#ff6b8a',true);}
+    addFx({kind:'arc',x:P.x,y:P.y-12,r:155,a,spread:Math.PI*0.6,color:'#b0102a',w:16,dur:0.3});addFx({kind:'arc',x:P.x,y:P.y-12,r:150,a,spread:Math.PI*0.6,color:'#ffd0d8',w:4,dur:0.25});
+    for(let k=0;k<16;k++){const b=a+rand(-1.8,1.8),r=rand(60,160);particle('spark',P.x+Math.cos(b)*r,P.y-12+Math.sin(b)*r,'#ff4060',{a:b+Math.PI,v:r*2.5,dur:0.35});}}
+   if(T>=3)throwScythe(a,dmg*2,30,{steal:0.06});
    G.shake=Math.max(G.shake,6);break;}
-  case 'shield':P.rush={a,t:0.32,hit:new Set(),dmg:dmg*3};P.iframes=Math.max(P.iframes,0.4);G.shake=Math.max(G.shake,4);break;
+  case 'shield':P.rush={a,t:0.32,hit:new Set(),dmg:dmg*3,knock:T>=2?200:110};P.iframes=Math.max(P.iframes,0.4);G.shake=Math.max(G.shake,4);   // R93
+   if(T>=4){P.shield=Math.max(P.shield,P.maxHp*(T>=5?0.4:0.25));P.shieldT=Math.max(0,P.shieldT)+3;}break;
   case 'club':P.windup=0.35;P.windA=a;G.clubBlasts=0;break;
-  case 'tome':for(let k=0;k<9;k++)spirit(k/9*TAU,dmg*1.6,1.1);
+  case 'tome':{const n=T>=3?14:9;for(let k=0;k<n;k++)spirit(k/n*TAU,dmg*1.6,1.1,T,true);   // R94
    damageCircle(P.x,P.y,160,dmg*1.5,{knock:120,fx:P.x,fy:P.y});
-   addFx({kind:'ring',x:P.x,y:P.y,r0:20,r:170,color:'#a8f0ff',w:10,dur:0.4});sparkRing(P.x,P.y-12,120,24,'#a8f0ff');G.shake=Math.max(G.shake,7);break;
+   addFx({kind:'ring',x:P.x,y:P.y,r0:20,r:170,color:'#a8f0ff',w:10,dur:0.4});sparkRing(P.x,P.y-12,120,24,'#a8f0ff');G.shake=Math.max(G.shake,7);break;}
  }
 }
-function spirit(a,dmg,life){
- G.pproj.push({x:P.x,y:P.y,vx:Math.cos(a)*520,vy:Math.sin(a)*520,r:9,dmg,life,pierce:999,hit:new Set(),explode:0,knock:6,kind:'spirit',color:'#a8f0ff',
-  o:{dot:[dmg*1.2,2],dotKey:'tome',dotCol:'#a8f0ff'}});
+function spirit(a,dmg,life,T,charged){
+ T=T||1;const p={x:P.x,y:P.y,vx:Math.cos(a)*520,vy:Math.sin(a)*520,spd:520,r:9,dmg,life,pierce:999,hit:new Set(),explode:0,knock:6,kind:'spirit',color:'#a8f0ff',
+  o:{dot:[dmg*1.2,2],dotKey:'tome',dotCol:'#a8f0ff'}};
+ if(T>=4){p.flyT=0.22;p.stopT=0.2;p.life=Math.max(life,2.2);p.boomDmg=dmg*1.3;p.zoneDur=T>=5?(charged?6:3):0;}   // stop, then strike and explode
+ else if(T>=3){p.homing=true;p.lock=true;p.life=life*1.6;}   // lock on to one enemy
+ else if(T>=2&&charged)p.homing=true;
+ G.pproj.push(p);return p;
 }
-// Club charged attack: after the wind-up, three explosions march outward along the swing (R30).
+function swordWave(a,dmg,col){G.pproj.push({x:P.x,y:P.y,vx:Math.cos(a)*700,vy:Math.sin(a)*700,r:80,dmg,life:0.7,pierce:999,hit:new Set(),explode:0,knock:40,kind:'wave',color:col});}
+function throwScythe(a,dmg,r,st){G.pproj.push({x:P.x,y:P.y,vx:Math.cos(a)*620,vy:Math.sin(a)*620,r,dmg,life:0.6,pierce:999,hit:new Set(),explode:0,knock:18,kind:'scythe',color:'#d8d0ff',o:Object.assign({},st)});}
+function clubBlast(x,y,r,dmg,T){G.clubBlasts++;damageCircle(x,y,r,dmg,{knock:T>=4?120:30,fx:P.x,fy:P.y});
+ addFx({kind:'flash',x,y,r,color:'#ffb04a',dur:0.25});addFx({kind:'ring',x,y,r0:8,r:r*1.05,color:'#fff0c0',w:5,dur:0.3});sparkle(x,y,6,'#ffb04a',0.9,r*0.4);debris(x,y,4,'#7a5030',0.8);G.shake=Math.max(G.shake,3);}
+// R88: the hammer's slam. At tier 5 it also flattens nearby structures for 8 s.
+function hammerSlam(x,y,dmg,T){
+ const r=T>=3?280:250;damageCircle(x,y,r,dmg*3.6,{knock:110,stun:1.2,slow:T>=2?3:0,fx:x,fy:y});
+ for(let i=0;i<3;i++)addFx({kind:'ring',x,y,r0:20,r:r+i*20,color:i?(T>=2?WT_COL[T]:'#c09060'):'#ffffff',w:10-i*3,dur:0.4+i*0.1});
+ burst(x,y,35,'#a08060',2.2);G.shake=Math.max(G.shake,15);
+ if(T>=5){for(const s of G.structs){const cx=clamp(x,s.x,s.x+s.w),cy=clamp(y,s.y,s.y+s.h);if(dist2(x,y,cx,cy)<420*420){s.broken=8;if(onScreen(s.x+s.w/2,s.y+s.h/2,100))debris(s.x+s.w/2,s.y+s.h/2,10,'#6a5a4a',1.5);}}
+  addFx({kind:'ring',x,y,r0:40,r:440,color:'#6a5a4a',w:16,dur:0.6});G.shake=Math.max(G.shake,26);}
+}
+function addPulse(x,y,rmax,dmg,gen){G.pulses.push({x,y,r:10,rmax,spd:600,dmg,gen,hit:new Set(),kids:0});G.pulseCount=(G.pulseCount||0)+1;}
+function updatePulses(dt){
+ for(const q of G.pulses){q.r+=q.spd*dt;
+  for(const e of G.enemies){if(e.dead||q.hit.has(e))continue;const d=Math.sqrt(dist2(e.x,e.y,q.x,q.y));
+   if(d<q.r+e.r&&d>q.r-60-e.r){q.hit.add(e);hitEnemy(e,q.dmg,{knock:25,fx:q.x,fy:q.y});
+    if(q.gen===0&&G.weapon==='hammer'&&P.wtier>=5&&q.kids<10){q.kids++;addPulse(e.x,e.y,130,q.dmg*0.5,1);}}}   // tier 5: every hit pulses again
+  if(q.r>=q.rmax)q.done=true;}
+ G.pulses=G.pulses.filter(q=>!q.done);
+}
+function updateMPillars(dt){   // R90 tier 5: pillars of magic drifting away from the player
+ for(const m of G.mpillars){m.t-=dt;m.x+=m.vx*dt;m.y+=m.vy*dt;m.tick-=dt;if(m.tick<=0){m.tick=0.25;damageCircle(m.x,m.y,40,m.dmg,{knock:6,fx:m.x,fy:m.y});}}
+ G.mpillars=G.mpillars.filter(m=>m.t>0);
+}
+// R89 tier 4+: a massive arrow picks an enemy no other homing arrow has claimed.
+function pickArrowTarget(p){
+ let best=null,bd=1400*1400,any=null,ad=bd;
+ for(const e of G.enemies){if(e.dead||p.hit.has(e))continue;const q=dist2(p.x,p.y,e.x,e.y);if(q<ad){ad=q;any=e;}
+  if(q<bd&&!G.pproj.some(o=>o!==p&&o.tgt===e)){bd=q;best=e;}}
+ return best||any;
+}
+// Club charged attack: after the wind-up, explosions march outward along the swing (R30, R92).
 function clubSwing(){
- const a=P.windA,ca=Math.cos(a),sa=Math.sin(a),x0=P.x,y0=P.y,dmg=WEAPONS.club.dmg*P.dmgMult*2.6;
+ const T=P.wtier||1,a=P.windA,ca=Math.cos(a),sa=Math.sin(a),x0=P.x,y0=P.y,dmg=wdmg()*2.6;
  addFx({kind:'arc',x:P.x,y:P.y-12,r:70,a,spread:1.4,color:'#ffffff',w:10,dur:0.2});
- for(let k=0;k<3;k++)later(0.15*k,()=>{const x=x0+ca*110*(k+1),y=y0+sa*110*(k+1),r=85+12*k;G.clubBlasts++;
-  damageCircle(x,y,r,dmg,{knock:50});addFx({kind:'flash',x,y,r,color:'#ffb04a',dur:0.3});addFx({kind:'ring',x,y,r0:10,r:r*1.1,color:'#fff0c0',w:8,dur:0.35});
+ if(T>=5){P.dualT=8;floatText(P.x,P.y-60,'Double-wield!','#ffd84a',true);addFx({kind:'ring',x:P.x,y:P.y,r0:10,r:120,color:'#ffd84a',w:8,dur:0.5});return;}
+ const n=T>=3?8:3,gap=T>=3?0.08:0.15,big=T>=2?1.3:1;
+ for(let k=0;k<n;k++)later(gap*k,()=>{const x=x0+ca*110*(k+1),y=y0+sa*110*(k+1),r=(85+12*Math.min(k,2))*big;G.clubBlasts++;
+  damageCircle(x,y,r,dmg,T>=4?{knock:120,weak:4,fx:x0,fy:y0}:{knock:50});addFx({kind:'flash',x,y,r,color:'#ffb04a',dur:0.3});addFx({kind:'ring',x,y,r0:10,r:r*1.1,color:'#fff0c0',w:8,dur:0.35});
   sparkle(x,y,12,'#ffb04a',1.2,r*0.4);debris(x,y,8,'#7a5030',1.1);G.shake=Math.max(G.shake,6);});
 }
 function dash(){
- if(P.dashCd>0||P.rush||G.state!=='play')return;
- const m=mouseWorld();P.dashA=Math.atan2(m.y-P.y,m.x-P.x);P.dashT=DASH_TIME;P.dashCd=DASH_CD;P.iframes=Math.max(P.iframes,0.2);
+ if(P.dashCd>0||P.rush||P.leap||G.state!=='play')return;
+ const m=mouseWorld(),T=G.weapon==='shield'?P.wtier||1:0;P.dashA=Math.atan2(m.y-P.y,m.x-P.x);P.dashT=DASH_TIME;P.dashCd=DASH_CD;P.iframes=Math.max(P.iframes,0.2);
+ P.dashDist=DASH_DIST*(T>=2?1.5:1)*(T>=5?1.3:1);P.dashHit=new Set();P.dashDrag=T>=5?new Set():null;   // R93
+ if(T>=3){P.shield=Math.max(P.shield,P.maxHp*(T>=5?0.4:0.25));P.shieldT=Math.max(P.shieldT,5);addFx({kind:'ring',x:P.x,y:P.y,r0:10,r:shieldRadius()+10,color:'#e0b84f',w:5,dur:0.35});}
  addFx({kind:'ghost',x:P.x,y:P.y,form:FORMS[P.form],dur:0.3});sparkle(P.x,P.y-12,8,'#ffffff',0.6);
 }
+const shieldRadius=()=>(15+P.form*0.7)*1.9*(G.weapon==='shield'&&P.wtier>=5?1.5:1);
 
 /* ================= SPELLS ================= */
 function nearestEnemy(x,y,maxd,ex){let best=null,bd=maxd*maxd;for(const e of G.enemies){if(e.dead||(ex&&ex.has(e)))continue;const q=dist2(x,y,e.x,e.y);if(q<bd){bd=q;best=e;}}return best;}
@@ -1773,9 +1874,9 @@ function onGmDown(b){
 /* ================= FLOOR FLOW ================= */
 function startFloor(){
  G.floorTime=0;G.phase='wave';G.dur=60+15*G.floor;G.merchantFight=false;G.robbed=false;G.draft=null;G.draftAt=null;G.portal=null;G.portalT=0;G.spawnAcc=0;G.packT=rand(12,16);
- G.enemies=[];G.pproj=[];G.eproj=[];G.hazards=[];G.pstrikes=[];G.zones=[];G.beams=[];G.orbs=[];G.pickups=[];G.timers=[];G.casts=[];G.cart=null;G.rituals=[];G.ezones=[];
+ G.enemies=[];G.pproj=[];G.eproj=[];G.hazards=[];G.pstrikes=[];G.zones=[];G.beams=[];G.orbs=[];G.pickups=[];G.timers=[];G.casts=[];G.cart=null;G.rituals=[];G.ezones=[];G.pulses=[];G.mpillars=[];
  // every floor is a new board (R19): new layout and colour theme, player back in the centre
- G.theme=themeFor(G.floor);G.structs=genMap(G.floor);G.decor=genDecor(G.floor,G.structs);G.corpses=[];P.x=WORLD/2;P.y=WORLD/2;P.rush=null;P.dashT=0;P.windup=0;
+ G.theme=themeFor(G.floor);G.structs=genMap(G.floor);G.decor=genDecor(G.floor,G.structs);G.corpses=[];P.x=WORLD/2;P.y=WORLD/2;P.rush=null;P.dashT=0;P.windup=0;P.leap=null;P.z=0;
  banner('Floor '+G.floor+': '+G.theme.name,G.theme.sub+' · Survive until the '+bossName(bossDef(G.floor))+' arrives');
  if(G.theme.hostile)placeHostiles(G.theme);
  // initial wave pours in from the board's edges
@@ -1799,8 +1900,18 @@ function update(dt){
  // player projectiles
  for(const p of G.pproj){
   if(p.dead)continue;
-  if(p.homing){const t=nearestEnemy(p.x,p.y,380);if(t){const cur=Math.atan2(p.vy,p.vx);let dl=(Math.atan2(t.y-p.y,t.x-p.x)-cur)%TAU;
-   if(dl>Math.PI)dl-=TAU;if(dl<-Math.PI)dl+=TAU;const na=cur+clamp(dl,-7*dt,7*dt);p.vx=Math.cos(na)*p.spd;p.vy=Math.sin(na)*p.spd;}}
+  if(p.homing){const t=p.lock&&p.tgt&&!p.tgt.dead?p.tgt:nearestEnemy(p.x,p.y,p.lock?600:380);if(p.lock)p.tgt=t;   // R94 tier 3 spirits lock on
+   if(t){const cur=Math.atan2(p.vy,p.vx),turn=p.lock?14:7;let dl=(Math.atan2(t.y-p.y,t.x-p.x)-cur)%TAU;
+   if(dl>Math.PI)dl-=TAU;if(dl<-Math.PI)dl+=TAU;const na=cur+clamp(dl,-turn*dt,turn*dt);p.vx=Math.cos(na)*p.spd;p.vy=Math.sin(na)*p.spd;}}
+  if(p.flyT!==undefined){   // R94 tier 4+: fly, stop, then strike the nearest enemy and explode
+   if(p.flyT>0)p.flyT-=dt;
+   else if(p.stopT>0){p.stopT-=dt;p.vx=p.vy=0;if(p.stopT<=0){p.tgt=nearestEnemy(p.x,p.y,700);p.explode=55;p.dmg=p.boomDmg;}}
+   if(p.tgt){if(p.tgt.dead)p.tgt=nearestEnemy(p.x,p.y,700);if(p.tgt){const d=Math.hypot(p.tgt.x-p.x,p.tgt.y-p.y)||1;p.vx=(p.tgt.x-p.x)/d*900;p.vy=(p.tgt.y-p.y)/d*900;}}}
+  if(p.home){p.age+=dt;   // R89 tier 4+: massive arrows stop, then home in on different enemies
+   if(!p.stopped&&p.age>=0.2){p.stopped=true;p.stopT=0.3;p.vx=p.vy=0;}
+   else if(p.stopT>0){p.stopT-=dt;p.vx=p.vy=0;if(p.stopT<=0){p.tgt=pickArrowTarget(p);if(!p.tgt){p.vx=p.v0x*1150;p.vy=p.v0y*1150;}}}
+   if(p.tgt&&(p.tgt.dead||p.hit.has(p.tgt))){if(p.tgt.dead)p.tgt=pickArrowTarget(p);else p.tgt=null;}
+   if(p.tgt){const d=Math.hypot(p.tgt.x-p.x,p.tgt.y-p.y)||1;p.vx=(p.tgt.x-p.x)/d*1300;p.vy=(p.tgt.y-p.y)/d*1300;}}
   p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;
   pokeMerchants((mx,my,mr)=>dist2(p.x,p.y,mx,my)<(p.r+mr)**2);
   for(const e of G.enemies){
@@ -1823,7 +1934,7 @@ function update(dt){
  G.pproj=G.pproj.filter(p=>!p.dead);
  // enemy projectiles, with glowing trails (R18)
  for(const p of G.eproj){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;const rr=p.r+P.r*0.7;
-  if(dist2(p.x,p.y,P.x,P.y)<rr*rr){damagePlayer(p.dmg,p.src);if(p.slow)P.slowT=Math.max(P.slowT,p.slow);p.life=0;if(p.el)elementFx(p.el,p.x,p.y-14,6,0.8);else sparkle(p.x,p.y-14,6,p.color,0.8);}
+  if(dist2(p.x,p.y,P.x,P.y)<rr*rr){damagePlayer(p.dmg*(G.weapon==='shield'&&P.wtier>=3?0.7:1),p.src);if(p.slow)P.slowT=Math.max(P.slowT,p.slow);p.life=0;if(p.el)elementFx(p.el,p.x,p.y-14,6,0.8);else sparkle(p.x,p.y-14,6,p.color,0.8);}
   if(Math.random()<0.6&&onScreen(p.x,p.y,80)){if(p.el)elPart(p.el,p.x+rand(-3,3),p.y-14+rand(-3,3),{v:rand(5,30)});   // boss spell bolts trail their element (R84)
    else particle(Math.random()<0.5?'ember':'spark',p.x+rand(-3,3),p.y-14+rand(-3,3),p.color,{v:rand(5,30),dur:rand(0.25,0.4),sz:rand(2,4)});}}
  G.eproj=G.eproj.filter(p=>p.life>0&&p.x>-50&&p.y>-50&&p.x<WORLD+50&&p.y<WORLD+50);
@@ -1838,9 +1949,11 @@ function update(dt){
     sparkLine(h.ax,h.ay,h.bx,h.by,16,'#ffb070',h.w);for(let k=0;k<6;k++){const f=Math.random();debris(h.ax+(h.bx-h.ax)*f,h.ay+(h.by-h.ay)*f,1,'#7a4a2a',0.8);}}}}}
  G.hazards=G.hazards.filter(h=>!h.done);
  updateEZones(dt);
+ updatePulses(dt);updateMPillars(dt);
+ for(const s of G.structs)if(s.broken>0)s.broken-=dt;   // R88: flattened buildings rebuild
  // player strikes (rain, meteors, psychic waves)
  for(const s of G.pstrikes){s.t+=dt;
-  if(s.big&&!s.wave&&s.t<s.delay&&Math.random()<0.7){const p=s.t/s.delay;   // falling meteor leaves a trail
+  if(s.big&&!s.wave&&!s.laser&&s.t<s.delay&&Math.random()<0.7){const p=s.t/s.delay;   // falling meteor leaves a trail
    elPart(s.el,s.x+(1-p)*120+rand(-8,8),s.y-(1-p)*600+rand(-8,8),{v:rand(10,40),dur:0.45});}
   if(s.t>=s.delay){s.done=true;damageCircle(s.x,s.y,s.r,s.dmg,Object.assign({},s.o,{knock:s.knock||10}));
   if(s.wave){addFx({kind:'ring',x:s.x,y:s.y,r0:s.r*0.2,r:s.r,color:s.color,w:14,dur:0.5});addFx({kind:'ring',x:s.x,y:s.y,r0:s.r*0.15,r:s.r*0.9,color:'#ffffff',w:5,dur:0.4});
@@ -1853,8 +1966,8 @@ function update(dt){
  // zones: swirling motes inside the area
  for(const z of G.zones){z.t-=dt;z.tick-=dt;
   if(z.pull)for(const e of G.enemies){if(e.dead||e.boss||e.static)continue;const q=dist2(e.x,e.y,z.x,z.y);if(q<(z.r+60)**2&&q>100){const d=Math.sqrt(q);e.x+=(z.x-e.x)/d*z.pull*dt;e.y+=(z.y-e.y)/d*z.pull*dt;}}
-  if(z.tick<=0){z.tick=0.25;damageCircle(z.x,z.y,z.r,z.dps*0.25,Object.assign({},z.o,{slow:z.slow?0.6:0}));}
-  if(onScreen(z.x,z.y,z.r)){let n=(1+(z.tier||1))*z.r/120*dt*10;while(n>0){if(Math.random()<n)elementFx(z.el,z.x,z.y,1,0.4,z.r);n--;}}}
+  if(z.tick<=0){z.tick=0.25;if(!z.nodmg)damageCircle(z.x,z.y,z.r,z.dps*0.25,Object.assign({},z.o,{slow:z.slow?0.6:0}));}
+  if(z.el&&onScreen(z.x,z.y,z.r)){let n=(1+(z.tier||1))*z.r/120*dt*10;while(n>0){if(Math.random()<n)elementFx(z.el,z.x,z.y,1,0.4,z.r);n--;}}}
  G.zones=G.zones.filter(z=>z.t>0);
  // beams
  for(const b of G.beams){b.t-=dt;b.tick-=dt;if(b.tick<=0){b.tick=0.1;const bx=P.x+Math.cos(P.aim)*b.len,by=P.y+Math.sin(P.aim)*b.len;
@@ -1894,9 +2007,18 @@ function updateEZones(dt){
  G.ezones=G.ezones.filter(z=>z.t>0);
 }
 function explodeProj(p){
+ const hitL=p.kind==='orb'?G.enemies.filter(e=>!e.dead&&dist2(p.x,p.y,e.x,e.y)<(p.explode+e.r)**2):null;
  damageCircle(p.x,p.y,p.explode,p.dmg,Object.assign({},p.o,{knock:p.knock||15,slow:p.slow||(p.o&&p.o.slow)||0}));
  addFx(p.el?{kind:'area',el:p.el,x:p.x,y:p.y,r:p.explode,color:p.color,dur:0.35}:{kind:'flash',x:p.x,y:p.y,r:p.explode,color:p.color,dur:0.25});addFx({kind:'ring',x:p.x,y:p.y,r0:5,r:p.explode,color:p.color,w:4,dur:0.25});
  burst(p.x,p.y,8,p.color);if(p.el)elementFx(p.el,p.x,p.y,10,p.explode/60,p.explode*0.4);else sparkle(p.x,p.y,8,p.color,p.explode/60,p.explode*0.4);p.dead=true;
+ if(p.kind==='orb'&&G.weapon==='staff'){const T=P.wtier||1;   // R90
+  if(T>=2){const cr=T>=3?85:60,cd=p.dmg*(T>=3?0.55:0.4);   // chain explosions on every enemy the burst hit
+   for(const e of hitL){if(onScreen(e.x,e.y,cr)){addFx({kind:'flash',x:e.x,y:e.y,r:cr,color:'#d9a0ff',dur:0.25});addFx({kind:'ring',x:e.x,y:e.y,r0:6,r:cr,color:'#ffffff',w:3,dur:0.25});}
+    for(const o of G.enemies){if(o.dead||o===e)continue;if(dist2(o.x,o.y,e.x,e.y)<(cr+o.r)**2)hitEnemy(o,cd,{knock:10,fx:e.x,fy:e.y});}}}
+  if(T>=4)for(let k=0;k<4;k++){const b=k*TAU/4+0.4;G.pproj.push({x:p.x,y:p.y,vx:Math.cos(b)*380,vy:Math.sin(b)*380,r:6,dmg:p.dmg*0.4,life:0.35,pierce:0,hit:new Set(),explode:50,kind:'miniorb',color:'#e0a0ff'});}
+  if(T>=5){const base=Math.atan2(p.y-P.y,p.x-P.x);for(const off of [-0.5,0,0.5])G.mpillars.push({x:p.x,y:p.y,vx:Math.cos(base+off)*140,vy:Math.sin(base+off)*140,t:2,tick:0,dmg:p.dmg*0.5});
+   if(G.mpillars.length>45)G.mpillars.splice(0,G.mpillars.length-45);}}
+ if(p.kind==='spirit'&&p.zoneDur)G.zones.push({x:p.x,y:p.y,r:60,dps:p.dmg*0.6,t:p.zoneDur,dur:p.zoneDur,tick:0,color:'#a8f0ff',tier:1,tome:true,plain:true,o:{}});   // R94 tier 5
 }
 function stepParticles(dt){
  for(const p of G.parts){p.t+=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;const k=p.shape==='debris'?0.985:0.94;p.vx*=k;p.vy=p.vy*k+(p.g||0)*dt;p.rot=(p.rot||0)+(p.spin||0)*dt;}
@@ -1908,19 +2030,27 @@ function updatePlayer(dt){
  if(mouse.down)P.holdT+=dt;
  P.charging=mouse.down&&P.holdT>0.2;P.charge=P.charging?clamp((P.holdT-0.2)/w.charge,0,1):0;
  const sp=P.speed*(P.charging?0.6:1)*(P.windup>0?0.4:1)*(P.slowT>0?0.6:1);   // R84: frozen/stunned by a boss spell = 40% slower
- if(l&&!P.rush){P.x+=mx/l*sp*dt;P.y+=my/l*sp*dt;P.moving=true;}else P.moving=false;
- if(P.dashT>0){const st=Math.min(dt,P.dashT);P.dashT-=dt;P.x+=Math.cos(P.dashA)*DASH_DIST/DASH_TIME*st;P.y+=Math.sin(P.dashA)*DASH_DIST/DASH_TIME*st;
+ if(l&&!P.rush&&!P.leap){P.x+=mx/l*sp*dt;P.y+=my/l*sp*dt;P.moving=true;}else P.moving=false;
+ if(P.dashT>0){const st=Math.min(dt,P.dashT),dd=P.dashDist||DASH_DIST,vx=Math.cos(P.dashA)*dd/DASH_TIME*st,vy=Math.sin(P.dashA)*dd/DASH_TIME*st;P.dashT-=dt;P.x+=vx;P.y+=vy;
+  const T=G.weapon==='shield'?P.wtier||1:0;
+  if(T>=4&&P.dashHit){const wr=T>=5?200:140,kb=(T>=5?200:120)*7;   // R93: the dash blows enemies away; tier 5 drags the close ones along
+   for(const e of G.enemies){if(e.dead||e.boss||e.static||P.dashHit.has(e))continue;const q=dist2(e.x,e.y,P.x,P.y);
+    if(P.dashDrag&&q<110*110){P.dashDrag.add(e);continue;}
+    if(q<wr*wr){P.dashHit.add(e);const a2=Math.atan2(e.y-P.y,e.x-P.x);e.kx+=Math.cos(a2)*kb;e.ky+=Math.sin(a2)*kb;if(onScreen(e.x,e.y,20))particle('cloud',e.x,e.y-10,'#e8f0f4',{a:a2,v:120,dur:0.4,sz:8});}}
+   if(P.dashDrag)for(const e of P.dashDrag)if(!e.dead){e.x+=vx;e.y+=vy;if(!P.dashHit.has(e)){P.dashHit.add(e);hitEnemy(e,wdmg(),{});}}}
   if(Math.random()<0.6)addFx({kind:'ghost',x:P.x,y:P.y,form:FORMS[P.form],dur:0.25});}
  if(P.bashT>0){P.bashT-=dt;P.x+=Math.cos(P.bashA)*260*dt;P.y+=Math.sin(P.bashA)*260*dt;}
+ if(P.leap){const Lp=P.leap;Lp.t+=dt;const p=Math.min(1,Lp.t/Lp.dur);P.x=Lp.fx+(Lp.tx-Lp.fx)*p;P.y=Lp.fy+(Lp.ty-Lp.fy)*p;P.z=Math.sin(Math.PI*p)*90;   // R88 leaping crush
+  if(p>=1){P.leap=null;P.z=0;hammerSlam(P.x,P.y,Lp.dmg,Lp.T);}}
  if(P.rush){const R=P.rush,st=Math.min(dt,R.t);R.t-=dt;P.x+=Math.cos(R.a)*1000*st;P.y+=Math.sin(R.a)*1000*st;   // shield rush (R29)
-  for(const e of G.enemies){if(e.dead||R.hit.has(e))continue;const rr=75+e.r;if(dist2(e.x,e.y,P.x,P.y)<rr*rr){R.hit.add(e);hitEnemy(e,R.dmg,{knock:110,fx:P.x,fy:P.y});sparkle(e.x,e.y-e.s,4,'#e0b84f',0.8);}}
+  for(const e of G.enemies){if(e.dead||R.hit.has(e))continue;const rr=75+e.r;if(dist2(e.x,e.y,P.x,P.y)<rr*rr){R.hit.add(e);hitEnemy(e,R.dmg,{knock:R.knock||110,fx:P.x,fy:P.y});sparkle(e.x,e.y-e.s,4,'#e0b84f',0.8);}}
   debris(P.x,P.y,1,'#8a7050',0.5);if(Math.random()<0.5)addFx({kind:'ghost',x:P.x,y:P.y,form:FORMS[P.form],dur:0.2});
   if(R.t<=0)P.rush=null;}
  if(P.windup>0){P.windup-=dt;if(P.windup<=0){P.windup=0;clubSwing();}}
- P.dashCd-=dt;
+ P.dashCd-=dt;if(P.dualT>0)P.dualT-=dt;
  for(const e of G.enemies)if(e.static&&!e.dead){const dx=P.x-e.x,dy=P.y-e.y,rr=P.r+e.r,q=dx*dx+dy*dy;   // can't walk through watchtowers
   if(q<rr*rr&&q>0.01){const d=Math.sqrt(q);P.x=e.x+dx/d*rr;P.y=e.y+dy/d*rr;}}
- P.x=clamp(P.x,P.r,WORLD-P.r);P.y=clamp(P.y,P.r,WORLD-P.r);collideStructures(P);
+ P.x=clamp(P.x,P.r,WORLD-P.r);P.y=clamp(P.y,P.r,WORLD-P.r);if(!P.leap)collideStructures(P);
  const m=mouseWorld();P.aim=Math.atan2(m.y-P.y,m.x-P.x);
  P.atkCd-=dt;P.iframes-=dt;P.hurt-=dt;P.swingT-=dt;if(P.slowT>0)P.slowT-=dt;
  if(P.shieldT>0){P.shieldT-=dt;if(P.shieldT<=0)P.shield=0;}
@@ -2135,6 +2265,7 @@ function renderShop(){
   <p class="sub">${L('The merchants greet you','The merchant pawns greet you')} · Floor ${f} cleared · You are a <b>${rankName()}</b> · <b class="frag">${money(P.gold)}</b> · HP ${Math.ceil(P.hp)}/${P.maxHp}</p>
   <h2>SPELL SCROLLS</h2><div class="cards3 four" id="shSpells"></div>
   ${S.gm?'<h2 style="color:#ff4fd8">GRANDMASTER RELIC</h2><div class="cards3" id="shGm"></div>':''}
+  <h2>WEAPON FORGE</h2><div class="cards3" id="shForge"></div>
   <h2>RELICS & POTIONS</h2><div class="cards3 four" id="shItems"></div>
   <h2>YOUR SPELLS</h2><div class="row">${P.spells.map((s,i)=>`<span class="eq">${i+1}: ${s?SPELL_BY_ID[s.id].name+' Lv'+s.lvl:'— empty —'}</span>`).join('')}</div>
   <div class="row"><button class="btn small" id="shRe">Reroll scrolls (${money(S.reroll)})</button></div>
@@ -2148,6 +2279,12 @@ function renderShop(){
  if(S.gm){const sold=S.sold.gm,d=document.createElement('div');d.className='card t6'+(sold||P.gold<GM_PRICE?' dis':'');
   d.innerHTML=spellCardHTML(S.gm,`<p class="price">${sold?'SOLD':money(GM_PRICE)}</p>`);
   d.onclick=()=>{if(S.sold.gm||P.gold<GM_PRICE)return;P.gold-=GM_PRICE;S.sold.gm=true;equipSpell(S.gm,()=>{G.state='shop';renderShop();});};$('shGm').appendChild(d);}
+ const fb=$('shForge'),WT=P.wtier||1,nx=WT+1,fp=WEAPON_UP_PRICE[nx]||0,fd=document.createElement('div');   // R86 weapon upgrades
+ if(WT>=5){fd.className='card stat dis';fd.innerHTML=`<span class="badge" style="background:#e8f6ff">Tier 5</span><span class="ico">${WEAPONS[G.weapon].ico}</span><h3>${weaponTierName(G.weapon,5)}</h3><p>Fully upgraded.</p>`;fd.onclick=()=>{};}
+ else{fd.className='card t'+nx+(P.gold<fp?' dis':'');
+  fd.innerHTML=`<span class="badge" style="background:${TIER_COL[nx]}">Weapon tier ${nx}</span><span class="ico">${WEAPONS[G.weapon].ico}</span><h3>${weaponTierName(G.weapon,nx)}</h3><p>${WEAPON_PERKS[G.weapon][nx]} +20% damage.</p><p class="price">${money(fp)}</p>`;
+  fd.onclick=()=>{if((P.wtier||1)>=5||P.gold<fp)return;P.gold-=fp;P.wtier=(P.wtier||1)+1;renderShop();};}
+ fb.appendChild(fd);
  const ib=$('shItems');
  const pot=document.createElement('div');pot.className='card stat'+(S.potion||P.gold<potPrice||P.hp>=P.maxHp?' dis':'');
  pot.innerHTML=`<span class="badge" style="background:#e88">Potion</span><span class="ico">⚗</span><h3>Royal Elixir</h3><p>Fully restore your HP.</p><p class="price">${S.potion?'SOLD':money(potPrice)}</p>`;
@@ -2267,6 +2404,7 @@ function drawGround(){
 function drawStructures(){
  for(const s of G.structs){
   if(s.x>cam.x+VW+20||s.x+s.w<cam.x-20||s.y>cam.y+VH+20||s.y+s.h<cam.y-20)continue;
+  if(s.broken>0){ctx.fillStyle='rgba(60,50,40,.55)';for(let k=0;k<6;k++){const hx=s.x+hsh(k+s.x)*s.w,hy=s.y+hsh(k*7+s.y)*s.h;ctx.fillRect(hx-6,hy-4,12+hsh(k)*10,8);}continue;}   // R88: flattened rubble
   ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(s.x+6,s.y+8,s.w,s.h);
   const th=G.theme;
   if(th.ground&&drawFantasyStruct(s,th))continue;
@@ -2427,9 +2565,9 @@ function drawShard(x,y,s,rot){
 }
 function drawPlayer(){
  const t=G.time,type=FORMS[P.form],s=15+P.form*0.7;
- const bob=P.moving?Math.abs(Math.sin(t*12))*4:Math.sin(t*2)*1;const rot=P.moving?Math.sin(t*12)*0.06:0;
+ const bob=(P.moving?Math.abs(Math.sin(t*12))*4:Math.sin(t*2)*1)+(P.z||0);const rot=P.moving?Math.sin(t*12)*0.06:0;
  shadow(P.x,P.y,s,0.3);
- if(P.shield>0){ctx.strokeStyle='rgba(192,144,96,.8)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(P.x,P.y-s,s*1.9,0,TAU);ctx.stroke();}
+ if(P.shield>0){ctx.strokeStyle='rgba(192,144,96,.8)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(P.x,P.y-s-(P.z||0),shieldRadius(),0,TAU);ctx.stroke();}
  for(const o of G.orbs)for(let k=0;k<o.n;k++){const a=o.a+k*TAU/o.n,x=P.x+Math.cos(a)*o.r,y=P.y+Math.sin(a)*o.r-14;ctx.fillStyle=o.color;ctx.beginPath();ctx.arc(x,y,11,0,TAU);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();}
  if(P.iframes>0&&Math.floor(t*20)%2)ctx.globalAlpha=0.5;
  const glow=P.charge>=1?`rgba(224,184,79,${0.6+0.4*Math.sin(t*20)})`:P.charging?'rgba(224,184,79,.35)':null;
@@ -2439,24 +2577,26 @@ function drawPlayer(){
  // weapon
  let a=P.aim+(P.swingT>0&&G.weapon!=='bow'&&G.weapon!=='tome'?(P.swingT/0.15-0.5)*1.6:0);
  if(P.windup>0)a=P.windA-1.8*(1-P.windup/0.35)+(Math.random()-0.5)*0.15;   // club winds back and shakes
+ const wc=WT_COL[P.wtier||1];   // R86: gold, obsidian, enchanted and mirror weapons
+ if((P.wtier||1)>=4&&Math.random()<0.25)particle('spark',P.x+Math.cos(a)*36+rand(-6,6),P.y-s*1.2-bob+Math.sin(a)*36+rand(-6,6),P.wtier>=5?'#ffffff':'#c8a0ff',{v:rand(5,25),dur:0.3,sz:rand(2,3.5)});
  ctx.save();ctx.translate(P.x,P.y-s*1.2-bob);ctx.rotate(a);ctx.lineCap='round';
  switch(G.weapon){
-  case 'sword':ctx.strokeStyle='#2b2b2b';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(12,0);ctx.lineTo(44,0);ctx.stroke();ctx.strokeStyle='#e6ecf5';ctx.lineWidth=4;ctx.stroke();
+  case 'sword':ctx.strokeStyle='#2b2b2b';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(12,0);ctx.lineTo(44+((P.wtier||1)-1)*3,0);ctx.stroke();ctx.strokeStyle=wc||'#e6ecf5';ctx.lineWidth=4;ctx.stroke();
    ctx.strokeStyle='#8a6a3a';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(14,-7);ctx.lineTo(14,7);ctx.stroke();break;
-  case 'bow':ctx.strokeStyle='#6b4a2a';ctx.lineWidth=4;ctx.beginPath();ctx.arc(10,0,18,-1.2,1.2);ctx.stroke();
+  case 'bow':ctx.strokeStyle=wc||'#6b4a2a';ctx.lineWidth=4;ctx.beginPath();ctx.arc(10,0,18,-1.2,1.2);ctx.stroke();
    const pull=P.charging?P.charge*10:0;ctx.strokeStyle='#eee';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(10+18*Math.cos(1.2),-18*Math.sin(1.2));ctx.lineTo(10-pull,0);ctx.lineTo(10+18*Math.cos(1.2),18*Math.sin(1.2));ctx.stroke();break;
   case 'staff':ctx.strokeStyle='#6b4a2a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(4,0);ctx.lineTo(40,0);ctx.stroke();
-   ctx.fillStyle='#c77dff';ctx.beginPath();ctx.arc(43,0,6+P.charge*5,0,TAU);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();break;
+   ctx.fillStyle=wc||'#c77dff';ctx.beginPath();ctx.arc(43,0,6+P.charge*5,0,TAU);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();break;
   case 'hammer':ctx.strokeStyle='#6b4a2a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(4,0);ctx.lineTo(34,0);ctx.stroke();
-   ctx.fillStyle='#8f8f97';ctx.strokeStyle='#2b2b2b';ctx.lineWidth=2;ctx.fillRect(30,-12,14,24);ctx.strokeRect(30,-12,14,24);break;
+   ctx.fillStyle=wc||'#8f8f97';ctx.strokeStyle='#2b2b2b';ctx.lineWidth=2;ctx.fillRect(30,-12,14,24);ctx.strokeRect(30,-12,14,24);break;
   case 'scythe':ctx.strokeStyle='#5a3a22';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-6,0);ctx.lineTo(46,0);ctx.stroke();
-   ctx.strokeStyle='#2b2b2b';ctx.lineWidth=6;ctx.beginPath();ctx.arc(30,-2,20,-1.9,-0.05);ctx.stroke();ctx.strokeStyle='#e6e2f5';ctx.lineWidth=3;ctx.stroke();break;
-  case 'shield':ctx.fillStyle='#f4ecd8';ctx.strokeStyle='#2b2b2b';ctx.lineWidth=2;ctx.beginPath();ctx.arc(20,0,15,0,TAU);ctx.fill();ctx.stroke();
+   ctx.strokeStyle='#2b2b2b';ctx.lineWidth=6;ctx.beginPath();ctx.arc(30,-2,20,-1.9,-0.05);ctx.stroke();ctx.strokeStyle=wc||'#e6e2f5';ctx.lineWidth=3;ctx.stroke();break;
+  case 'shield':ctx.fillStyle=wc||'#f4ecd8';ctx.strokeStyle='#2b2b2b';ctx.lineWidth=2;ctx.beginPath();ctx.arc(20,0,15,0,TAU);ctx.fill();ctx.stroke();
    ctx.strokeStyle='#e0b84f';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(20,-9);ctx.lineTo(20,9);ctx.moveTo(13,0);ctx.lineTo(27,0);ctx.stroke();break;
   case 'club':ctx.strokeStyle='#6b4a2a';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(4,0);ctx.lineTo(30,0);ctx.stroke();
-   ctx.fillStyle='#7a5530';ctx.strokeStyle='#2b2b2b';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(38,0,13,9,0,0,TAU);ctx.fill();ctx.stroke();
+   ctx.fillStyle=wc||'#7a5530';ctx.strokeStyle='#2b2b2b';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(38,0,13,9,0,0,TAU);ctx.fill();ctx.stroke();
    ctx.fillStyle='#ccc';for(const [sx,sy] of [[34,-7],[42,-6],[46,0],[40,6],[33,6]]){ctx.beginPath();ctx.arc(sx,sy,1.8,0,TAU);ctx.fill();}break;
-  case 'tome':{const f=Math.sin(G.time*4)*2;ctx.fillStyle='#3a2a5a';ctx.strokeStyle='#e0b84f';ctx.lineWidth=2;ctx.fillRect(12,-10+f,20,20);ctx.strokeRect(12,-10+f,20,20);
+  case 'tome':{const f=Math.sin(G.time*4)*2;ctx.fillStyle=wc||'#3a2a5a';ctx.strokeStyle='#e0b84f';ctx.lineWidth=2;ctx.fillRect(12,-10+f,20,20);ctx.strokeRect(12,-10+f,20,20);
    ctx.fillStyle='#f4ecd8';ctx.fillRect(15,-8+f,14,16);ctx.fillStyle='#a8f0ff';ctx.globalAlpha=0.6+0.4*Math.sin(G.time*6);ctx.fillRect(18,-4+f,8,2);ctx.fillRect(18,1+f,8,2);ctx.globalAlpha=1;break;}
  }
  ctx.restore();
@@ -2629,7 +2769,9 @@ function drawBolt(p,a,y,look){
 }
 function drawWorldFx(){
  // zones
- for(const z of G.zones){const p=1-z.t/z.dur,fade=clamp(Math.min(z.t/0.3,(z.dur-z.t)/0.2+0.6),0,1);drawArea(z.el,z.x,z.y,z.r,fade,p);
+ for(const z of G.zones){const p=1-z.t/z.dur,fade=clamp(Math.min(z.t/0.3,(z.dur-z.t)/0.2+0.6),0,1);
+  if(z.plain){ctx.globalAlpha=0.3*fade;ctx.fillStyle=z.color;blob(z.x,z.y,z.r);ctx.fill();ctx.globalAlpha=0.8*fade;ctx.strokeStyle='#e8fbff';ctx.lineWidth=2;ctx.setLineDash([6,6]);ctx.lineDashOffset=G.time*30;ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;continue;}   // R94 tome areas
+  drawArea(z.el,z.x,z.y,z.r,fade,p);
   ctx.beginPath();ctx.arc(z.x,z.y,z.r,0,TAU);ctx.globalAlpha=0.7;ctx.strokeStyle=z.color;ctx.lineWidth=3;ctx.setLineDash([14,10]);ctx.lineDashOffset=-G.time*60;ctx.stroke();ctx.setLineDash([]);
   if(z.pull){for(let k=0;k<4;k++){const a=G.time*3+k*TAU/4;ctx.beginPath();ctx.arc(z.x,z.y,z.r*(0.25+0.15*k)*(z.swirl?1-p*0.8:1),a,a+1.5);ctx.stroke();}}
   ctx.globalAlpha=0.35;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(z.x,z.y,z.r*(0.55+0.08*Math.sin(G.time*4)),0,TAU);ctx.stroke();
@@ -2647,7 +2789,8 @@ function drawWorldFx(){
    ctx.strokeStyle='rgba(255,60,40,.6)';ctx.lineWidth=h.w*p;ctx.stroke();}}
  // spell strikes
  for(const s of G.pstrikes){const p=clamp(s.t/s.delay,0,1);ctx.strokeStyle=s.color;ctx.lineWidth=2;ctx.globalAlpha=0.7;ctx.beginPath();ctx.arc(s.x,s.y,s.r*(s.big?1:p),0,TAU);ctx.stroke();
-  if(s.big){ctx.globalAlpha=1;ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(s.x+(1-p)*120,s.y-(1-p)*600,s.r*0.3,0,TAU);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.stroke();}
+  if(s.laser){ctx.globalAlpha=0.3+0.5*p;ctx.fillStyle=s.color;const w=s.r*0.25*p+6;ctx.fillRect(s.x-w,s.y-900,w*2,900);ctx.fillStyle='#ffffff';ctx.fillRect(s.x-w*0.35,s.y-900,w*0.7,900);}   // R90 the giant laser
+  else if(s.big){ctx.globalAlpha=1;ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(s.x+(1-p)*120,s.y-(1-p)*600,s.r*0.3,0,TAU);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.stroke();}
   else if(p>0.6){ctx.globalAlpha=1;ctx.strokeStyle=s.color;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(s.x,s.y-(1-p)*250-30);ctx.lineTo(s.x,s.y-(1-p)*250);ctx.stroke();}
   ctx.globalAlpha=1;}
  if(G.draft)drawDraft(G.draft);if(G.portal)drawPortal(G.portal);
@@ -2784,7 +2927,16 @@ function drawRituals(){
  if(G.rituals.length)ctx.globalAlpha=1;
 }
 function drawProjAndFx(){
+ for(const q of G.pulses){ctx.globalAlpha=0.8*(1-q.r/q.rmax)+0.1;ctx.strokeStyle=q.gen?'#ffe0a0':'#e8d0a0';ctx.lineWidth=q.gen?3:5;blob(q.x,q.y,q.r);ctx.stroke();ctx.globalAlpha=1;}   // R88 pulses
+ for(const m of G.mpillars){if(!onScreen(m.x,m.y,60))continue;const f=Math.min(1,m.t/0.4);ctx.globalAlpha=0.35*f;ctx.fillStyle='#c77dff';ctx.fillRect(m.x-16,m.y-130,32,130);   // R90 pillars of magic
+  ctx.globalAlpha=0.85*f;ctx.fillStyle='#f0dcff';ctx.fillRect(m.x-5,m.y-130,10,130);ctx.beginPath();ctx.ellipse(m.x,m.y,30,12,0,0,TAU);ctx.strokeStyle='#c77dff';ctx.lineWidth=3;ctx.stroke();ctx.globalAlpha=1;}
  for(const p of G.pproj){const a=Math.atan2(p.vy,p.vx),y=p.y-14;
+  if(p.kind==='wave'){const f=Math.min(1,p.life/0.25);ctx.globalAlpha=f;ctx.lineCap='round';   // R87 wave slash: a crescent of light
+   ctx.strokeStyle=p.color==='#ffffff'?'#cfe8ff':p.color;ctx.lineWidth=16;ctx.beginPath();ctx.arc(p.x-Math.cos(a)*40,y-Math.sin(a)*40,p.r,a-1.0,a+1.0);ctx.stroke();
+   ctx.strokeStyle='#ffffff';ctx.lineWidth=5;ctx.stroke();ctx.globalAlpha=1;continue;}
+  if(p.kind==='scythe'){const r=p.r,q=G.time*18;ctx.save();ctx.translate(p.x,y);ctx.rotate(q);ctx.lineCap='round';   // R91 a spinning thrown scythe
+   ctx.strokeStyle='#2b2b2b';ctx.lineWidth=r*0.4;ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*1.2);ctx.stroke();ctx.strokeStyle=p.color;ctx.lineWidth=r*0.22;ctx.stroke();
+   ctx.strokeStyle='#5a3a22';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-r,0);ctx.lineTo(r,0);ctx.stroke();ctx.restore();continue;}
   if(p.kind==='arrow'||p.kind==='bigarrow'){const L=p.kind==='bigarrow'?46:20;ctx.strokeStyle=p.color;ctx.lineWidth=p.kind==='bigarrow'?7:3;ctx.lineCap='round';
    ctx.beginPath();ctx.moveTo(p.x-Math.cos(a)*L,y-Math.sin(a)*L);ctx.lineTo(p.x,y);ctx.stroke();
    if(p.kind==='bigarrow'){ctx.strokeStyle='rgba(224,184,79,.35)';ctx.lineWidth=p.r*2;ctx.stroke();}}
@@ -2846,7 +2998,7 @@ function drawHUD(){
  if(P.shield>0){ctx.fillStyle='rgba(220,190,140,.7)';ctx.fillRect(82,44,248*clamp(P.shield/P.maxHp,0,1),6);}
  txt(Math.ceil(P.hp)+' / '+P.maxHp,206,58,12,'#fff','center');
  bar(82,68,248,8,P.xp/P.xpNext,'#5fd0ff');
- drawLoot(90,93,7,0);txt(String(P.gold),102,98,15,L('#ffd84a','#f4ecd8'),'left');txt(WEAPONS[G.weapon].ico+' '+WEAPONS[G.weapon].name,186,98,15,'#e0b84f','left');
+ drawLoot(90,93,7,0);txt(String(P.gold),102,98,15,L('#ffd84a','#f4ecd8'),'left');txt(WEAPONS[G.weapon].ico+' '+weaponTierName(G.weapon,P.wtier||1),186,98,15,P.wtier>1?WT_COL[P.wtier]:'#e0b84f','left');
  // score panel
  panel(VW-202,12,190,72);
  txt('Score '+G.score.toLocaleString(),VW-192,38,16,'#f4ecd8');
@@ -2893,7 +3045,7 @@ function drawHUD(){
  // minimap
  const M=150,mx=VW-M-14,my=VH-M-14,k=M/WORLD;
  ctx.fillStyle='rgba(38,24,14,.8)';ctx.fillRect(mx,my,M,M);ctx.strokeStyle='#e0b84f';ctx.lineWidth=2;ctx.strokeRect(mx,my,M,M);
- ctx.fillStyle=G.theme.maze?'#e0b84f':G.theme.stone;for(const s of G.structs)ctx.fillRect(mx+s.x*k,my+s.y*k,Math.max(1,s.w*k),Math.max(1,s.h*k));
+ ctx.fillStyle=G.theme.maze?'#e0b84f':G.theme.stone;for(const s of G.structs)if(!(s.broken>0))ctx.fillRect(mx+s.x*k,my+s.y*k,Math.max(1,s.w*k),Math.max(1,s.h*k));
  ctx.fillStyle='#d33';for(const e of G.enemies)if(!e.boss&&!e.static)ctx.fillRect(mx+e.x*k-1,my+e.y*k-1,2,2);
  ctx.fillStyle='#ff8a3c';for(const e of G.enemies)if(e.static)ctx.fillRect(mx+e.x*k-3,my+e.y*k-3,6,6);
  if(G.boss){ctx.fillStyle=CHECK;ctx.fillStyle='#e0b84f';ctx.fillRect(mx+G.boss.x*k-4,my+G.boss.y*k-4,8,8);}
