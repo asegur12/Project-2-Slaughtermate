@@ -127,7 +127,7 @@ optional theme (R62).
 - End commit messages with the attribution line the session provides.
 - Push only when the user asks.
 - Don't commit handoff files or this file until the user has reviewed them and asks for a commit.
-  The auto-mode permission check also blocks such commits, so ask the user to make them.
+  The permission check may refuse such a commit unless the user's message explicitly asks for it.
 
 ## Decision records
 - Store them in `docs/decisions/NNNN-short-title.md`, numbered 0001, 0002, ...

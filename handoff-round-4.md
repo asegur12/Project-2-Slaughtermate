@@ -7,13 +7,9 @@ state at the end of Round 4.
 
 - **The game is now called Magic Rush**, a fantasy medieval hack'n'slash. The Round 3 chess look
   (Slaughtermate) is an optional theme behind a start-screen button.
-- Branch `main`, last commit `84be609`. **Nothing from Round 4 has been pushed.**
-- **Uncommitted, waiting for the user:**
-  - `handoff-round-3.md`: it contains the user's Round 4 requirements section, which is the
-    Round 4 source. The user agreed to commit it, but the auto-mode permission check blocked the
-    commit.
-  - `CLAUDE.md`: updated this round.
-  - This file.
+- Branch `main`, everything committed and pushed to `origin`.
+- `handoff-round-3.md` (whose Round 4 requirements section is the Round 4 source), `CLAUDE.md`
+  and this file were committed together in `115f16e`, at the user's request.
 - Round 4 commits, in order:
 
   | Commit | What it did |
@@ -209,5 +205,6 @@ state at the end of Round 4.
   and pulls. Mind control is cleared when an enemy falls asleep.
 - **`toGoblin`** marks the old enemy dead without a kill, score or loot, and spawns a fresh
   goblin. Anything that counts kills or deaths should keep that in mind.
-- **Committing handoff files and `CLAUDE.md`:** the auto-mode permission check refuses to commit
-  them even when the user agreed. Ask the user to commit those themselves.
+- **Committing handoff files and `CLAUDE.md`:** in Round 4 the permission check once refused to
+  commit them. A later commit went through after the user explicitly asked for it. If it's
+  refused, ask the user.
