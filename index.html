@@ -64,6 +64,7 @@ input{font:16px Georgia;padding:6px 10px;border-radius:6px;border:2px solid var(
 #weapons .card{padding:8px 10px}#weapons .card p{font-size:12px;margin:0 0 2px}
 .crown{position:absolute;top:2px;right:44px;line-height:1;text-shadow:0 0 6px #000,1px 1px 0 #000}
 .marks{position:absolute;top:3px;right:82px;display:flex;gap:3px;line-height:0}.marks .crown{position:static}.bell svg{display:block}
+.crown.gm{display:inline-block;transform:rotate(180deg)}   /* R83: the upside-down crown */
 .shard{width:11px;height:15px;vertical-align:-2px}.frag{color:var(--ivory)}
 #logbook .panel{max-width:1100px}.loggrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 @media(max-width:900px){.loggrid{grid-template-columns:repeat(2,1fr)}}
@@ -368,7 +369,14 @@ const ETYPES={
  king:{hp:400,dmg:22,speed:48,r:19,s:16,xp:15,gold:12,score:200},
  watchtower:{hp:260,dmg:12,speed:0,r:26,s:22,xp:6,gold:6,score:80,static:true},   // floor 5 hostile structure
  helper:{hp:95,dmg:10,speed:90,r:14,s:13,xp:2,gold:3,score:30},                   // R78 shop helper: a tanky goblin, Merchant fight only
+ disciple:{hp:1100,dmg:12,speed:72,r:16,s:15,xp:20,gold:20,score:500},            // R80 grand disciple: hides in the swarm
 };
+// R81: floor 7, the Grandmaster's Domain: a giant black-and-white board in both looks. Its swarm is chess pieces,
+// with checkered elites (makeElite) and grand disciples. Kept apart from FLOOR_THEMES / SPAWN_W, which stay six floors.
+const DOMAIN_THEME={name:"The Grandmaster's Domain",sub:'A giant board beyond the realm',tileA:'#f2f2ee',tileB:'#0c0c0e',tile:200,bg:'#000000',border:'#000000',edge:'#ff4fd8',
+ stone:'#f4f0ff',stoneDark:'#0c0c0e',stoneLine:'#ff4fd8',houseCols:['#222'],roof:'#000',accent:'#ffffff',gold:'#ff4fd8',castles:0,towns:0,houses:[0,0],hostile:0,maze:false,pillars:10,domain:true};
+const DOMAIN_SPAWN={pawn:36,knight:20,bishop:15,rook:15,queen:9,king:3,disciple:2};
+const ELITE_CHANCE=0.1,ELITE_SIZE=1.3,ELITE_HP=2.5;
 const SPAWN_W=[
  {pawn:85,knight:15},
  {pawn:65,knight:20,bishop:15},
@@ -387,7 +395,10 @@ const BOSSES=[
 ];
 const bossName=B=>L(B.fname,B.name);
 // R78: the secret Merchant boss (the three merchants riding their cart). Its HP and damage scale with the floor.
-const MERCHANT_BOSS={type:'merchant',name:'The Merchant',fname:'The Merchant',hp:1800,hpF:1500,dmg:14,dmgF:5,speed:80,r:52,s:40};
+// R82: the Grandmaster, about 1.7x the Tyrant King's HP. Same name in both looks.
+const GM_BOSS={type:'grandmaster',name:'Grandmaster',fname:'Grandmaster',hp:31500,dmg:46,speed:62,r:58,s:62};
+const bossDef=f=>f>=7?GM_BOSS:BOSSES[clamp(f-1,0,5)];
+const MERCHANT_BOSS={type:'merchant',name:'Merchant',fname:'Merchant',hp:1800,hpF:1500,dmg:14,dmgF:5,speed:80,r:52,s:40};
 const BOSS_ATTACKS={
  pawn:['stomp','summon','ring','march'],
  knight:['leap','leap3','ring','summon'],
@@ -396,7 +407,10 @@ const BOSS_ATTACKS={
  queen:['xbeam','plus','leap','spiral','star','summon'],
  king:['quake','summon','star','ring','cannon'],
  merchant:['ram','helpers','goods','ram'],
+ grandmaster:['rookwall','promote','enrage','gmspell','gmspell'],
 };
+const GM_FOE_SPELLS=['despair','inversion','seal','doom','slumber','nightfog','calamity','excalibur'];   // R82: every Grandmaster spell but Hellfire
+const GM_FOE_AREA=0.82,GM_DYING=2.6;   // his spells cover 18% less; he glows for 2.6 s before exploding (R83)
 const SUMMONS={pawn:['pawn'],knight:['knight','pawn'],bishop:['bishop','pawn'],rook:['rook','pawn','pawn'],queen:['knight','bishop','pawn'],king:['rook','knight','bishop','pawn']};
 // R84: the spell tiers each boss casts from (index = boss number - 1). The Merchant uses 1-4 (R78).
 const BOSS_SPELL_TIERS=[[1],[1,2],[1,2,3],[1,2,3,4],[1,2,3,4,5],[4,5]];
@@ -554,6 +568,39 @@ function drawFigure(kind,x,y,s,o){
  f(o);FT=null;
  ctx.restore();
 }
+/* ---------- R96 the Grandmaster: a giant eye, two checkered hands and a checkered crown halo ---------- */
+// Grand disciples are the eye alone. With an uploaded face (R97) the image replaces the whole eye.
+// Returns the parts it drew, e.g. ['eye','hand','hand','halo'].
+function checkerFill(fn,x,y,s){ctx.save();ctx.translate(x,y);ctx.scale(s,s);ctx.beginPath();fn();ctx.fillStyle=CHECK;ctx.fill();ctx.strokeStyle='#ff4fd8';ctx.lineWidth=2/s;ctx.stroke();ctx.restore();}
+function drawGrandmaster(x,y,s,o){
+ o=o||{};const t=G.time,parts=[],dis=!!o.disciple,er=s*(dis?0.95:1),cy=y-s*(dis?1.5:1.8);
+ if(!dis){   // two floating checkered hands
+  for(const sd of [-1,1]){const hx=x+sd*s*1.75,hy=cy+s*0.55+Math.sin(t*2.6+sd)*s*0.18,u=s*0.42;
+   checkerFill(()=>{ctx.moveTo(-0.55*sd,0.9);ctx.lineTo(-0.6*sd,-0.1);ctx.lineTo(-1.15*sd,-0.55);ctx.lineTo(-0.95*sd,-0.8);ctx.lineTo(-0.45*sd,-0.45);
+    for(let k=0;k<4;k++){const fx=(-0.35+k*0.32)*sd;ctx.lineTo(fx,-0.6);ctx.lineTo(fx,-1.35+Math.abs(k-1.5)*0.18);ctx.lineTo(fx+0.24*sd,-1.35+Math.abs(k-1.5)*0.18);ctx.lineTo(fx+0.24*sd,-0.6);}
+    ctx.lineTo(0.85*sd,-0.5);ctx.lineTo(0.75*sd,0.9);ctx.closePath();},hx,hy,u);parts.push('hand');}
+ }
+ if(o.buff||o.enraged){ctx.globalAlpha=0.35;ctx.fillStyle=o.enraged?'#ff3030':'#ffd84a';ctx.beginPath();ctx.arc(x,cy,er*1.35,0,TAU);ctx.fill();ctx.globalAlpha=1;}
+ if(faceReady()){   // R97: the uploaded image is the whole face
+  ctx.save();ctx.beginPath();ctx.arc(x,cy,er,0,TAU);ctx.clip();ctx.drawImage(FACE_IMG,x-er,cy-er,er*2,er*2);ctx.restore();
+  ctx.strokeStyle='#ff4fd8';ctx.lineWidth=Math.max(2,s*0.08);ctx.beginPath();ctx.arc(x,cy,er,0,TAU);ctx.stroke();parts.push('face');}
+ else{   // the eye
+  ctx.fillStyle='#f6f2ea';ctx.strokeStyle='#1a0a20';ctx.lineWidth=Math.max(2,s*0.07);ctx.beginPath();ctx.ellipse(x,cy,er,er*0.78,0,0,TAU);ctx.fill();ctx.stroke();
+  ctx.strokeStyle='rgba(200,30,60,.55)';ctx.lineWidth=Math.max(1,s*0.025);ctx.beginPath();for(let k=0;k<6;k++){const a=k*1.05+0.3;ctx.moveTo(x+Math.cos(a)*er*0.95,cy+Math.sin(a)*er*0.72);ctx.lineTo(x+Math.cos(a+0.2)*er*0.6,cy+Math.sin(a+0.2)*er*0.45);}ctx.stroke();
+  const lx=clamp((P.x-x)/400,-1,1)*er*0.28,ly=clamp((P.y-cy)/400,-1,1)*er*0.2;   // it follows the player
+  ctx.fillStyle='#8a1fb0';ctx.beginPath();ctx.arc(x+lx,cy+ly,er*0.45,0,TAU);ctx.fill();ctx.fillStyle='#ff4fd8';ctx.beginPath();ctx.arc(x+lx,cy+ly,er*0.32,0,TAU);ctx.fill();
+  ctx.fillStyle='#08000c';ctx.beginPath();ctx.ellipse(x+lx,cy+ly,er*0.11,er*0.28,0,0,TAU);ctx.fill();
+  ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(x+lx-er*0.14,cy+ly-er*0.14,er*0.08,0,TAU);ctx.fill();parts.push('eye');}
+ if(!dis){   // the checkered crown halo
+  const hy=cy-er*1.25+Math.sin(t*1.8)*s*0.06,w=s*0.62;
+  ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=0.25+0.1*Math.sin(t*4);ctx.fillStyle='#ff4fd8';ctx.beginPath();ctx.ellipse(x,hy,w*1.4,w*0.7,0,0,TAU);ctx.fill();ctx.restore();
+  checkerFill(()=>{crownPts(0,0.35,1,0.9).forEach(([a,b],i)=>i?ctx.lineTo(a,b):ctx.moveTo(a,b));ctx.closePath();},x,hy,w);parts.push('halo');}
+ if(o.flash){ctx.globalAlpha=0.45;ctx.fillStyle='#ff6050';ctx.beginPath();ctx.arc(x,cy,er,0,TAU);ctx.fill();ctx.globalAlpha=1;}
+ if(o.dying>0){ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=Math.min(1,o.dying);ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(x,cy,er*(1.2+o.dying*1.5),0,TAU);ctx.fill();   // R83: glowing with light
+  ctx.strokeStyle='#fff8e0';ctx.lineWidth=6;ctx.beginPath();for(let k=0;k<16;k++){const a=k*TAU/16+t;ctx.moveTo(x+Math.cos(a)*er,cy+Math.sin(a)*er);ctx.lineTo(x+Math.cos(a)*er*(2+o.dying*4),cy+Math.sin(a)*er*(2+o.dying*4));}ctx.stroke();ctx.restore();}
+ return parts;
+}
+let FACE_IMG=null;const faceReady=()=>false;   // replaced by the face upload (R97)
 // R64: a gold bar (the fantasy currency).
 function drawGoldBar(x,y,s,rot){
  ctx.save();ctx.translate(x,y);if(rot)ctx.rotate(rot*0.4);
@@ -624,7 +671,8 @@ const cam={x:0,y:0};
 const mouseWorld=()=>({x:mouse.x+cam.x,y:mouse.y+cam.y});
 
 /* ================= MAP ================= */
-const themeFor=f=>L(FANTASY_FLOORS,FLOOR_THEMES)[clamp((f||1)-1,0,FLOOR_THEMES.length-1)];
+const themeFor=f=>(f||1)>=7?DOMAIN_THEME:L(FANTASY_FLOORS,FLOOR_THEMES)[clamp((f||1)-1,0,FLOOR_THEMES.length-1)];
+const pieceLook=()=>LOOK==='chess'||G.floor>=7;   // R81: chess pieces on the Grandmaster's board in both looks
 function genMap(floor){
  const T=themeFor(floor),S=[],C=WORLD/2;
  const ok=(x,y,w,h,m)=>{
@@ -665,6 +713,7 @@ function genMap(floor){
 // They use their own generator seeded from the layout and never touch Math.random(), so the game's
 // random sequence (and so gameplay) is exactly what it was in Round 3, whichever theme is on.
 function genDecor(floor,S){
+ if(floor>=7)return [];   // the Grandmaster's board is bare
  let a=(floor*7919+S.reduce((t,q)=>t+Math.round(q.x*3+q.y),0))>>>0;const R=()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
  const T=FANTASY_FLOORS[clamp((floor||1)-1,0,5)],out=[],C=WORLD/2;
  for(const k in T.deco)for(let n=0,i=0;n<T.deco[k]&&i<T.deco[k]*30;i++){
@@ -708,6 +757,7 @@ function placeHostiles(T){
 function collideStructures(o){
  let hit=false;
  for(const s of G.structs){
+  if(s.broken>0)continue;   // flattened by the tier 5 hammer (R88)
   if(o.x+o.r<s.x||o.x-o.r>s.x+s.w||o.y+o.r<s.y||o.y-o.r>s.y+s.h)continue;
   const cx=clamp(o.x,s.x,s.x+s.w),cy=clamp(o.y,s.y,s.y+s.h),dx=o.x-cx,dy=o.y-cy,q=dx*dx+dy*dy;
   if(q>=o.r*o.r)continue;
@@ -718,7 +768,7 @@ function collideStructures(o){
  }
  return hit;
 }
-function insideStruct(x,y,r){for(const s of G.structs)if(x>s.x-r&&x<s.x+s.w+r&&y>s.y-r&&y<s.y+s.h+r)return true;return false;}
+function insideStruct(x,y,r){for(const s of G.structs)if(!(s.broken>0)&&x>s.x-r&&x<s.x+s.w+r&&y>s.y-r&&y<s.y+s.h+r)return true;return false;}
 
 /* ================= STATE ================= */
 let G,P;
@@ -726,7 +776,7 @@ function makeState(){
  const S=genMap(1);
  return {state:'menu',time:0,runTime:0,floor:1,floorTime:0,phase:'wave',dur:75,enemies:[],pproj:[],eproj:[],hazards:[],pstrikes:[],zones:[],beams:[],orbs:[],
   pickups:[],fx:[],parts:[],texts:[],timers:[],casts:[],dealt:0,structs:S,decor:genDecor(1,S),corpses:[],theme:themeFor(1),difficulty:'normal',clubBlasts:0,shake:0,score:0,kills:0,pity:0,bags:{1:[],2:[],3:[],4:[],5:[],6:[]},statBag:[],
-  ezones:[],pendingLevels:0,spawnAcc:0,packT:16,banner:null,boss:null,weapon:'sword',clearT:0,shop:null,cart:null,cartT:0,rituals:[],gmPity:0,screenFlash:null};
+  ezones:[],hasDraft:false,draft:null,draftAt:null,portal:null,discipleDone:false,merchantFought:false,kingSlain:false,gmSlain:false,pendingLevels:0,spawnAcc:0,packT:16,banner:null,boss:null,weapon:'sword',clearT:0,shop:null,cart:null,cartT:0,rituals:[],gmPity:0,screenFlash:null};
 }
 function xpFor(l){return Math.floor(6+l*3.5+l*l*0.15);}
 function makePlayer(w){
@@ -856,7 +906,7 @@ function later(t,fn){G.timers.push({t,fn});}
 
 /* ================= DAMAGE ================= */
 function hitEnemy(e,dmg,o){
- if(e.dead)return 0;o=o||{};
+ if(e.dead||e.dying>=0)return 0;o=o||{};   // a dying Grandmaster takes no more damage (R83)
  const crit=!o.tick&&Math.random()<P.crit;if(crit)dmg*=2;
  if(e.weakT>0)dmg*=1.15;                                  // weakened by a Mind spell (R34)
  const dealt=Math.min(dmg,Math.max(0,e.hp));G.dealt+=dealt;
@@ -943,10 +993,12 @@ function stepCorpses(dt){
 }
 function killEnemy(e){
  if(e.dead)return;
+ if(e.type==='grandmaster'&&!e.blown){if(!(e.dying>=0))startGmDeath(e);return;}   // R83: he glows first, then explodes
  e.dead=true;G.kills++;G.score+=e.score*G.floor;
  burst(e.x,e.y-e.s,e.boss?80:9,e.boss?'#e0b84f':'#2a2a33',e.boss?2.5:1);
  if(!e.static&&(e.boss||dist2(e.x,e.y,P.x,P.y)<1100*1100)){   // R63 death animation (near the player only)
-  if(LOOK==='chess'){if(!e.boss)shatter(e.x,e.y,e.s,'#24242b','#a8a8b8');}
+  if(e.type==='disciple'||e.type==='grandmaster'){}   // they explode instead (R80, R83)
+  else if(pieceLook()){if(!e.boss)shatter(e.x,e.y,e.s,e.elite?'#ece6d6':'#24242b','#a8a8b8');}
   else if(G.corpses.length<140&&(e.boss?BOSS_LOOK[e.type]:enemyFig(e.type)))G.corpses.push({fig:e.boss?BOSS_LOOK[e.type]:enemyFig(e.type),x:e.x,y:e.y,s:e.s,flip:P.x<e.x,side:P.x<e.x?1:-1,boss:!!e.boss,t:0,dur:e.boss?0.9:0.45});}
  if(e.boss){   // R63: bosses go out with a large burst
   burst(e.x,e.y-e.s,110,'#ffd84a',3.2);burst(e.x,e.y-e.s,50,'#ffffff',2.4);
@@ -955,10 +1007,96 @@ function killEnemy(e){
   addFx({kind:'ring',x:e.x,y:e.y,r0:30,r:380,color:'#ffffff',w:26,dur:0.7});addFx({kind:'ring',x:e.x,y:e.y,r0:20,r:540,color:'#ffd84a',w:16,dur:0.9});
   addFx({kind:'spokes',x:e.x,y:e.y,r:460,n:28,color:'#ffd84a',dur:0.6});G.screenFlash={c:'#fff4d0',t:0,dur:0.5};}
  if(e.invBoom){const b=e.invBoom;e.invBoom=0;inversionBoom(e.x,e.y,b);}
+ if(e.type==='disciple')discipleBlast(e);
  if(e.boss){onBossDown(e);return;}
  if(G.phase==='cleared')return;
  G.pickups.push({x:e.x,y:e.y,k:'xp',v:e.xp*(1+0.25*(G.floor-1))});
  if(Math.random()<0.3)G.pickups.push({x:e.x+rand(-10,10),y:e.y+rand(-10,10),k:'frag',v:e.gold*randi(1,2),rot:rand(0,TAU)});
+}
+/* ---------- R80 the grand disciple ---------- */
+// He explodes, killing every non-boss enemy near him (the player is unharmed). On floor 3 his draft is left behind.
+function discipleBlast(e){
+ const R2=320*320;
+ for(const o of G.enemies)if(!o.dead&&!o.boss&&!o.static&&o!==e&&dist2(o.x,o.y,e.x,e.y)<R2)killEnemy(o);
+ if(G.floor===3&&!G.hasDraft)G.draftAt={x:e.x,y:e.y};
+ addFx({kind:'flash',x:e.x,y:e.y,r:320,color:'#ff4fd8',dur:0.5});addFx({kind:'ring',x:e.x,y:e.y,r0:20,r:340,color:'#ffffff',w:22,dur:0.6});
+ addFx({kind:'ring',x:e.x,y:e.y,r0:10,r:300,color:'#111111',w:10,dur:0.5});addFx({kind:'spokes',x:e.x,y:e.y,r:320,n:24,color:'#ff4fd8',dur:0.5});
+ for(let k=0;k<30;k++)particle('shard',e.x,e.y-e.s*1.6,k%2?'#ffffff':'#1a1a1a',{v:rand(150,420),dur:rand(0.5,0.9),sz:rand(4,8)});
+ G.shake=Math.max(G.shake,16);
+}
+// R80: the Grandmaster's Draft. Drinking it costs 30% of max HP (never fatal) and unlocks floor 7.
+function updateDraft(dt){
+ const d=G.draft;d.t+=dt;
+ if(dist2(P.x,P.y,d.x,d.y)<(P.r+22)**2){G.draft=null;G.hasDraft=true;P.hp=Math.max(1,P.hp-P.maxHp*0.3);P.hurt=0.4;
+  floatText(P.x,P.y-50,'-'+Math.round(P.maxHp*0.3),'#ff4d4d',true);addFx({kind:'ring',x:P.x,y:P.y,r0:60,r:10,color:'#ff4fd8',w:8,dur:0.5});G.screenFlash={c:'#2a0030',t:0,dur:0.8};
+  banner("You drank the Grandmaster's Draft","Something watches you now... beat Floor 6 to enter his domain");}
+}
+// R81: after the floor 6 boss (with the draft) a portal replaces the cart; it leads to floor 7.
+function updatePortal(dt){
+ if(!G.portal){G.portalT-=dt;if(G.portalT<=0){G.portal={x:WORLD/2,y:WORLD/2,t:0};floatText(WORLD/2,WORLD/2-90,'A portal opens...','#ff4fd8',true);}return;}
+ G.portal.t+=dt;
+ if(G.portal.t>0.6&&dist2(P.x,P.y,G.portal.x,G.portal.y)<(P.r+40)**2){G.floor=7;startFloor();}
+}
+/* ---------- R82 the Grandmaster's own attacks ---------- */
+function rookWall(b){   // a wall of checkered rooks sweeps across the screen from one edge
+ const side=randi(0,3),sp=360,gap=72,t=(Math.max(VW,VH)+260)/sp;
+ if(side<2){const x=side===0?cam.x-40:cam.x+VW+40;for(let y=cam.y+30;y<cam.y+VH;y+=gap)sweepRook(b,x,y,side===0?sp:-sp,0,t);}
+ else{const y=side===2?cam.y-40:cam.y+VH+40;for(let x=cam.x+30;x<cam.x+VW;x+=gap)sweepRook(b,x,y,0,side===2?sp:-sp,t);}
+ floatText(b.x,b.y-b.s*3,'Rook wall!','#ff4fd8',true);
+}
+function sweepRook(b,x,y,vx,vy,t){const e=makeElite(spawnEnemy('rook',clamp(x,20,WORLD-20),clamp(y,20,WORLD-20)));
+ e.sweep={vx,vy,t};e.dmg=b.dmg*1.2;e.dashing=true;e.xp=0;e.gold=0;e.score=0;return e;}
+function promoteNear(b){   // nearby enemies become rooks or queens with the same HP fraction
+ for(const e of G.enemies){if(e.dead||e.boss||e.static||e.sweep||e.charmT>0||e.type==='disciple'||e.type==='rook'||e.type==='queen')continue;
+  if(dist2(e.x,e.y,b.x,b.y)>500*500)continue;
+  const n=spawnEnemy(Math.random()<0.5?'rook':'queen',e.x,e.y);if(e.elite)makeElite(n);n.hp=n.maxHp*clamp(e.hp/e.maxHp,0.01,1);e.dead=true;
+  if(onScreen(e.x,e.y,60)){addFx({kind:'ring',x:e.x,y:e.y,r0:30,r:5,color:'#ff4fd8',w:5,dur:0.4});glint(e.x,e.y-20,4,1.2,20);}}
+ addFx({kind:'ring',x:b.x,y:b.y,r0:30,r:500,color:'#ff4fd8',w:10,dur:0.6});floatText(b.x,b.y-b.s*3,'Promotion!','#ff4fd8',true);
+}
+function enrageAll(b){   // enemies on screen charge headfirst at the player and die on contact
+ for(const e of G.enemies){if(e.dead||e.boss||e.static||e.sweep||e.charmT>0||e.sleepT>0||e.type==='disciple'||!onScreen(e.x,e.y,0))continue;e.kamikaze=6;}
+ G.screenFlash={c:'#ff2020',t:0,dur:0.4};floatText(b.x,b.y-b.s*3,'Charge!','#ff5050',true);
+}
+// The point the doom pillars chase: the player.
+const PT={get x(){return P.x;},get y(){return P.y;},s:16,dead:false};
+// R82: the Grandmaster casts a Grandmaster spell at the player, with a longer wind-up and an 18% smaller area.
+// They are the player's rituals with foe:true; updateRituals hurts the player instead of the enemies.
+function bossGM(b,id){
+ const d=SPELL_BY_ID[id],D=edmg(b),k=GM_FOE_AREA,tx=P.x,ty=P.y,col=spellCol(d),F={foe:true,t:0,src:b};
+ (b.castLog=b.castLog||[]).push(id);b.busy=Math.max(b.busy,1.2);
+ floatText(b.x,b.y-b.s*3.2,d.name+'!',col,true);addFx({kind:'glyph',x:b.x,y:b.y,r:b.r+70,color:col,dur:1.2,eye:true});
+ G.screenFlash={c:col,t:0,dur:0.5};G.shake=Math.max(G.shake,8);
+ switch(id){
+  case 'despair':G.rituals.push(Object.assign({kind:'despair',x:tx,y:ty,r:d.r*k,burst:3.6,dmg:D*3.2,
+   phantoms:FORMS.map((type,i)=>({type,a:i*TAU/6,white:i%2===0,ring:0,rise:0})).concat(FORMS.map((type,i)=>({type,a:i*TAU/6+TAU/12,white:i%2===1,ring:1,rise:0})))},F));break;
+  case 'inversion':G.rituals.push(Object.assign({kind:'inversion',x:b.x,y:b.y,r:d.r*k,dur:0.6,buff:8,hit:new Set()},F));
+   addFx({kind:'ring',x:b.x,y:b.y,r0:20,r:d.r*k,color:'#ff4fd8',w:40,dur:0.6});break;
+  case 'seal':{const h=d.r*k*0.68,R=Object.assign({kind:'seal',x:tx,y:ty,r:d.r*k,boom:3.4,dmg:D*3,portal:{x:tx,y:ty},links:[],glyphs:[[-1,-1],[1,-1],[1,1],[-1,1]].map(([a,c])=>({x:tx+a*h,y:ty+c*h}))},F);
+   R.glyphs.forEach((g,i)=>{const a=Math.atan2(ty-g.y,tx-g.x);for(const q of [-1,0,1])R.links.push({ax:g.x+Math.cos(a+Math.PI/2)*q*30,ay:g.y+Math.sin(a+Math.PI/2)*q*30,bx:tx,by:ty});
+    const n=R.glyphs[(i+1)%4];R.links.push({ax:g.x,ay:g.y,bx:n.x,by:n.y});});G.rituals.push(R);break;}
+  case 'doom':G.rituals.push(Object.assign({kind:'doom',delay:5.5,targets:[{e:PT,x:P.x,y:P.y}],pillars:[],dmg:D*1.3,pr:d.pr*k,hits:d.hits,end:5.5+d.hits*0.3+0.9},F));
+   addFx({kind:'beam',ax:b.x,ay:b.y-b.s,bx:P.x,by:P.y-16,w:3,color:'#c8ccd4',dur:0.5});break;
+  case 'slumber':G.rituals.push(Object.assign({kind:'slumber',x:tx,y:ty,r:d.r*k,dur:3.6,pull:150,dmg:D*3,sleep:1.5,fairies:[],nextF:0},F));break;
+  case 'nightfog':{const RS=[330,300,280,260,240,220,200,180,170,160,150,140].map(r=>r*k);
+   G.rituals.push(Object.assign({kind:'nightfog',x:b.x,y:b.y,dur:10,dmg:D*0.5,blobs:RS.map((r,i)=>{const a=i*2.4,dd=i?(120+(i*53)%260)*k:0;return {dx:Math.cos(a)*dd,dy:Math.sin(a)*dd*0.8,r,ph:i};})},F));break;}
+  case 'calamity':G.rituals.push(Object.assign({kind:'calamity',x:tx,y:ty,r:d.r*k,fuse:9,dmg:D*4},F));break;
+  case 'excalibur':G.rituals.push(Object.assign({kind:'excalibur',x:tx,y:ty,a:Math.atan2(ty-b.y,tx-b.x),land:1.3,fire:2.5,end:3.4,dmg:D*3,quake:D*1.6,qr:240*k,len:d.len,w:d.w*k},F));break;
+ }
+}
+const inFoe=(x,y,r)=>dist2(P.x,P.y,x,y)<(r+P.r*0.5)**2;
+// R83: the Grandmaster slowly glows with light, then explodes.
+function startGmDeath(e){
+ e.dying=0;e.hp=0;e.busy=1e9;G.rituals=G.rituals.filter(r=>!r.foe);G.hazards=[];G.eproj=[];G.ezones=[];
+ for(const o of G.enemies)if(o.sweep||o.kamikaze>0){o.dead=true;}
+ banner('The Grandmaster falters...','Light pours out of him');
+}
+function gmDying(e,dt){
+ e.dying+=dt;const f=e.dying/GM_DYING;G.shake=Math.max(G.shake,4+f*14);
+ if(onScreen(e.x,e.y,200)&&Math.random()<0.4+f)particle('streak',e.x+rand(-40,40),e.y-e.s*1.6+rand(-40,40),'#ffffff',{a:rand(0,TAU),v:rand(80,260)*(0.5+f),dur:0.5,sz:rand(5,10)});
+ if(e.dying>=GM_DYING){e.blown=true;killEnemy(e);
+  addFx({kind:'flash',x:e.x,y:e.y,r:1200,color:'#ffffff',dur:1.2});addFx({kind:'ring',x:e.x,y:e.y,r0:40,r:1100,color:'#ffffff',w:40,dur:1});
+  addFx({kind:'ring',x:e.x,y:e.y,r0:20,r:900,color:'#ff4fd8',w:24,dur:1.1});addFx({kind:'spokes',x:e.x,y:e.y,r:1000,n:40,color:'#ffffff',dur:0.8});
+  G.screenFlash={c:'#ffffff',t:0,dur:1.4};G.shake=40;}
 }
 function gainXp(v){
  P.xp+=v;
@@ -1063,7 +1201,7 @@ function castSpell(i){
 /* ---------- R51-R54 Grandmaster rituals ---------- */
 const spellCol=d=>d.col||EL_COL[d.el];
 // Outgoing enemy damage. Enemies weakened by Game of Despair (R52) deal 35% less.
-const edmg=e=>e.dmg*(e.despairT>0?0.65:1);
+const edmg=e=>e.dmg*(e.despairT>0?0.65:1)*(e.gmBuffT>0?1.35:1);   // R82: buffed by the Grandmaster's Mental Inversion
 function castGrandmaster(d,dmg,lv,tx,ty){
  G.screenFlash={c:spellCol(d),t:0,dur:0.6};G.shake=Math.max(G.shake,10);
  const sm=lv*P.spellMult;
@@ -1092,7 +1230,7 @@ function castGrandmaster(d,dmg,lv,tx,ty){
   case 'slumber':G.rituals.push({kind:'slumber',x:tx,y:ty,r:d.r,t:0,dur:d.dur,pull:d.pull,dmg,sleep:d.sleep,fairies:[],nextF:0});break;   // R71
   case 'nightfog':{   // R72: a swarm of large and very large circles of black fog that follows the player
    const RS=[330,300,280,260,240,220,200,180,170,160,150,140];
-   G.rituals=G.rituals.filter(r=>r.kind!=='nightfog');
+   G.rituals=G.rituals.filter(r=>r.kind!=='nightfog'||r.foe);
    G.rituals.push({kind:'nightfog',x:P.x,y:P.y,t:0,dur:d.dur,dmg,blobs:RS.map((r,k)=>{const a=k*2.4,dd=k?120+(k*53)%260:0;return {dx:Math.cos(a)*dd,dy:Math.sin(a)*dd*0.8,r,ph:k};})});
    for(let k=0;k<30;k++)particle('poof',P.x+rand(-300,300),P.y+rand(-220,220),'#150a1c',{v:rand(20,80),dur:rand(0.6,1),sz:rand(14,30)});break;}
   case 'calamity':G.rituals.push({kind:'calamity',x:tx,y:ty,r:d.r,t:0,fuse:d.fuse,dmg});break;   // R73
@@ -1110,9 +1248,9 @@ const despairRise=R=>clamp((R.t-(R.burst-0.35))/0.35,0,1);   // the pieces ascen
 const despairFade=R=>1-despairRise(R);
 // R72 helpers: is an enemy inside a nightmare fog?
 const inFogR=(R,e)=>R.blobs.some(b=>dist2(e.x,e.y,R.x+b.dx,R.y+b.dy)<b.r*b.r);
-const inNightFog=e=>G.rituals.some(R=>R.kind==='nightfog'&&inFogR(R,e));
+const inNightFog=e=>G.rituals.some(R=>R.kind==='nightfog'&&!R.foe&&inFogR(R,e));
 function fogRetaliate(src){
- const F=G.rituals.find(r=>r.kind==='nightfog');
+ const F=G.rituals.find(r=>r.kind==='nightfog'&&!r.foe);
  if(!F||inNightFog(src)||G.rituals.some(r=>r.kind==='fogmini'&&r.e===src))return;
  G.rituals.push({kind:'fogmini',e:src,x:src.x,y:src.y,r:Math.max(70,src.s*3+30),t:0,dur:4,dmg:F.dmg});
  for(let k=0;k<10;k++)particle('poof',src.x+rand(-30,30),src.y-rand(0,30),'#150a1c',{v:rand(20,60),dur:0.7,sz:rand(10,18)});
@@ -1136,9 +1274,10 @@ function updateRituals(dt){
    if(!R.crownBroken&&R.t>=R.burst-0.25){R.crownBroken=true;const oy=R.y-40;   // the crown shatters just before the burst
     for(let k=0;k<28;k++)particle('shard',R.x,oy,k%3?'#ffd84a':'#ffffff',{v:rand(120,380),dur:rand(0.4,0.8),sz:rand(4,8)});
     addFx({kind:'ring',x:R.x,y:oy,r0:10,r:120,color:'#ffd84a',w:8,dur:0.3});glint(R.x,oy,12,2,30);G.shake=Math.max(G.shake,10);}
-   for(const e of G.enemies)if(!e.dead&&!e.boss&&!e.static&&dist2(e.x,e.y,R.x,R.y)<R.r*R.r)e.slowT=Math.max(e.slowT,0.2);   // held inside the domain
+   if(!R.foe)for(const e of G.enemies)if(!e.dead&&!e.boss&&!e.static&&dist2(e.x,e.y,R.x,R.y)<R.r*R.r)e.slowT=Math.max(e.slowT,0.2);   // held inside the domain
    if(R.t>=R.burst){R.done=true;
-    for(const e of G.enemies){if(e.dead)continue;const rr=R.r+e.r;if(dist2(R.x,R.y,e.x,e.y)<rr*rr){hitEnemy(e,R.dmg,{knock:70,fx:R.x,fy:R.y,weak:R.weak});if(!e.dead)e.despairT=R.weak;}}
+    if(R.foe){if(inFoe(R.x,R.y,R.r)){damagePlayer(R.dmg,R.src);P.slowT=Math.max(P.slowT,1.5);}}
+    else for(const e of G.enemies){if(e.dead)continue;const rr=R.r+e.r;if(dist2(R.x,R.y,e.x,e.y)<rr*rr){hitEnemy(e,R.dmg,{knock:70,fx:R.x,fy:R.y,weak:R.weak});if(!e.dead)e.despairT=R.weak;}}
     addFx({kind:'flash',x:R.x,y:R.y,r:R.r*1.1,color:'#ffffff',dur:0.6});addFx({kind:'ring',x:R.x,y:R.y,r0:20,r:R.r*1.15,color:'#ffffff',w:26,dur:0.7});
     addFx({kind:'ring',x:R.x,y:R.y,r0:10,r:R.r,color:'#111111',w:14,dur:0.6});addFx({kind:'spokes',x:R.x,y:R.y,r:R.r,n:32,color:'#ffffff',dur:0.5});
     for(let k=0;k<70;k++){const a=rand(0,TAU);particle('piece',R.x,R.y-20,k%2?'#ffffff':'#9a9a9a',{a,v:rand(150,520),dur:rand(0.6,1.1),sz:rand(7,12)});G.parts[G.parts.length-1]&&(G.parts[G.parts.length-1].piece=pick(FORMS));}
@@ -1147,18 +1286,21 @@ function updateRituals(dt){
   case 'inversion':{
    const cr=R.r*Math.min(1,R.t/R.dur);
    if(R.t<=R.dur)for(const e of G.enemies){if(e.dead||R.hit.has(e))continue;const rr=cr+e.r;if(dist2(R.x,R.y,e.x,e.y)>=rr*rr)continue;R.hit.add(e);
+    if(R.foe){if(!e.boss){e.gmBuffT=R.buff;e.buffT=Math.max(e.buffT,R.buff);elementFx('mind',e.x,e.y-e.s,4,0.8);}continue;}   // R82: buffs enemies instead
     if(e.boss||e.static){hitEnemy(e,R.dmg,{});continue;}   // bosses and towers resist the control (R53) and take the psychic damage instead
     e.charmT=R.charm;e.charmBoom=R.boom;e.charmCd=0;elementFx('mind',e.x,e.y-e.s,6,0.8);}
    if(R.t>=R.dur+0.35)R.done=true;   // the glowing band lingers a moment after the pulse (R68)
    break;}
   case 'seal':{
    const Q=R.portal;
-   if(R.t>0.3&&R.t<R.boom){   // the great portal drags enemies in
+   if(R.t>0.3&&R.t<R.boom&&R.foe){if(inFoe(R.x,R.y,R.r+60)){const d=Math.hypot(Q.x-P.x,Q.y-P.y);if(d>6){const st=Math.min(d,120*dt);P.x+=(Q.x-P.x)/d*st;P.y+=(Q.y-P.y)/d*st;}}}   // the player is dragged in
+   else if(R.t>0.3&&R.t<R.boom){   // the great portal drags enemies in
     for(const e of G.enemies){if(e.dead||e.boss||e.static)continue;if(dist2(e.x,e.y,R.x,R.y)>(R.r+60)**2)continue;
      const d=Math.hypot(Q.x-e.x,Q.y-e.y);if(d>6){const st=Math.min(d,280*dt);e.x+=(Q.x-e.x)/d*st;e.y+=(Q.y-e.y)/d*st;}e.slowT=Math.max(e.slowT,0.2);}
     for(const g of R.glyphs)if(Math.random()<0.5){const f=Math.random();particle('spark',g.x+(Q.x-g.x)*f,g.y+(Q.y-g.y)*f,'#ff9aa8',{a:Math.atan2(Q.y-g.y,Q.x-g.x),v:220,dur:0.3,sz:rand(2.5,4)});}}
    if(R.t>=R.boom){R.done=true;
-    for(const e of G.enemies){if(e.dead)continue;const rr=R.r+e.r;if(dist2(R.x,R.y,e.x,e.y)<rr*rr){hitEnemy(e,R.dmg,{stun:R.freeze,fx:R.x,fy:R.y});if(!e.dead&&!e.boss&&!e.static){e.frozenT=R.freeze;e.slowT=Math.max(e.slowT,R.freeze+2);}}}
+    if(R.foe){if(inFoe(R.x,R.y,R.r)){damagePlayer(R.dmg,R.src);P.slowT=Math.max(P.slowT,1.5);}}
+    else for(const e of G.enemies){if(e.dead)continue;const rr=R.r+e.r;if(dist2(R.x,R.y,e.x,e.y)<rr*rr){hitEnemy(e,R.dmg,{stun:R.freeze,fx:R.x,fy:R.y});if(!e.dead&&!e.boss&&!e.static){e.frozenT=R.freeze;e.slowT=Math.max(e.slowT,R.freeze+2);}}}
     addFx({kind:'flash',x:R.x,y:R.y,r:R.r*1.1,color:'#ffd0d8',dur:0.6});addFx({kind:'ring',x:R.x,y:R.y,r0:20,r:R.r*1.2,color:'#dc143c',w:28,dur:0.7});
     addFx({kind:'ring',x:R.x,y:R.y,r0:10,r:R.r,color:'#e9fbff',w:10,dur:0.6});addFx({kind:'area',el:'ice',x:R.x,y:R.y,r:R.r,dur:1.2});
     for(const g of R.glyphs){addFx({kind:'ring',x:g.x,y:g.y,r0:70,r:5,color:'#ffffff',w:8,dur:0.4});elementFx('ice',g.x,g.y,10,1.5,60);}
@@ -1166,12 +1308,13 @@ function updateRituals(dt){
     G.shake=Math.max(G.shake,26);G.screenFlash={c:'#ffd0d8',t:0,dur:0.7};}
    break;}
   case 'doom':
-   if(R.t<R.delay){for(const T of R.targets)if(!T.e.dead){T.x=T.e.x;T.y=T.e.y;T.e.slowT=Math.max(T.e.slowT,0.2);}}
+   if(R.t<R.delay){if(R.foe){const T=R.targets[0];T.x=P.x;T.y=P.y;P.slowT=Math.max(P.slowT,0.2);}   // the player is marked and slowed
+    else for(const T of R.targets)if(!T.e.dead){T.x=T.e.x;T.y=T.e.y;T.e.slowT=Math.max(T.e.slowT,0.2);}}
    else{
     if(!R.scheduled){R.scheduled=true;for(const T of R.targets)for(let k=0;k<R.hits;k++)R.pillars.push({T,at:R.delay+k*0.3+rand(0,0.12),hit:false,x:T.x,y:T.y});}
     for(const p of R.pillars)if(!p.hit&&R.t>=p.at){p.hit=true;p.ht=R.t;   // each pillar smites where its target is now
      if(!p.T.e.dead){p.T.x=p.T.e.x;p.T.y=p.T.e.y;}p.x=p.T.x+rand(-18,18);p.y=p.T.y+rand(-18,18);
-     damageCircle(p.x,p.y,R.pr,R.dmg,{fx:p.x,fy:p.y});
+     if(R.foe){if(inFoe(p.x,p.y,R.pr))damagePlayer(R.dmg,R.src);}else damageCircle(p.x,p.y,R.pr,R.dmg,{fx:p.x,fy:p.y});
      if(onScreen(p.x,p.y,R.pr)){addFx({kind:'ring',x:p.x,y:p.y,r0:10,r:R.pr,color:'#d8dce4',w:8,dur:0.35});debris(p.x,p.y,5,'#7a7a80',1);glint(p.x,p.y-40,3,1.2,20);}
      G.shake=Math.max(G.shake,7);}
     if(R.t>=R.end)R.done=true;}
@@ -1180,13 +1323,15 @@ function updateRituals(dt){
    if(R.t<R.dur){
     if(R.t>=R.nextF&&R.fairies.length<14){R.nextF+=0.25;R.fairies.push({a:rand(0,TAU),rr:rand(0.25,0.8)*R.r,ph:rand(0,TAU),t0:R.t});}
     for(const f of R.fairies)f.a+=dt*1.6;
-    for(const e of G.enemies){if(e.dead||e.static)continue;const q=dist2(e.x,e.y,R.x,R.y);if(q>(R.r+180)**2)continue;
+    if(R.foe){if(inFoe(R.x,R.y,R.r+180)){const d=Math.hypot(R.x-P.x,R.y-P.y);if(d>20){const st=Math.min(d-10,R.pull*dt);P.x+=(R.x-P.x)/d*st;P.y+=(R.y-P.y)/d*st;}}}   // dragged toward the vortex
+    else for(const e of G.enemies){if(e.dead||e.static)continue;const q=dist2(e.x,e.y,R.x,R.y);if(q>(R.r+180)**2)continue;
      if(e.boss){e.slowT=Math.max(e.slowT,0.3);continue;}
      const d=Math.sqrt(q);if(d>20){const ux=(R.x-e.x)/d,uy=(R.y-e.y)/d,st=Math.min(d-10,R.pull*dt),sw=0.45*R.pull*dt*Math.min(1,d/R.r);   // dragged in and swirled
       e.x+=ux*st-uy*sw;e.y+=uy*st+ux*sw;}e.slowT=Math.max(e.slowT,0.2);}
     if(onScreen(R.x,R.y,R.r))for(let k=0;k<3;k++){const a=rand(0,TAU),rr=rand(0.5,1.1)*R.r;particle('circle',R.x+Math.cos(a)*rr,R.y+Math.sin(a)*rr,'#ffd0f8',{a:a+Math.PI*0.6,v:rand(150,260),dur:0.5,sz:rand(3,6)});}}
    else{R.done=true;   // the fairies crack and explode; survivors fall asleep
-    for(const e of G.enemies){if(e.dead)continue;const rr=R.r+e.r;if(dist2(R.x,R.y,e.x,e.y)>=rr*rr)continue;hitEnemy(e,R.dmg,{});
+    if(R.foe){if(inFoe(R.x,R.y,R.r)){damagePlayer(R.dmg,R.src);P.slowT=Math.max(P.slowT,R.sleep);}}   // sleep becomes a slow on the player
+    else for(const e of G.enemies){if(e.dead)continue;const rr=R.r+e.r;if(dist2(R.x,R.y,e.x,e.y)>=rr*rr)continue;hitEnemy(e,R.dmg,{});
      if(!e.dead){if(e.boss)e.slowT=Math.max(e.slowT,R.sleep);else if(!e.static){e.sleepT=R.sleep;e.charmT=0;}}}
     for(const f of R.fairies){const fx=R.x+Math.cos(f.a)*f.rr,fy=R.y+Math.sin(f.a)*f.rr*0.8;
      for(let k=0;k<6;k++)particle('shard',fx,fy-20,k%2?'#ffd0f8':'#ffffff',{v:rand(80,260),dur:rand(0.4,0.8),sz:rand(3,6)});
@@ -1195,8 +1340,10 @@ function updateRituals(dt){
     glint(R.x,R.y,30,3,R.r*0.6);G.shake=Math.max(G.shake,20);G.screenFlash={c:'#ffe0f8',t:0,dur:0.6};}
    break;
   case 'nightfog':
-   R.x=P.x;R.y=P.y;
-   for(const e of G.enemies)if(!e.dead&&inFogR(R,e))fogGrab(e,R.dmg,dt);
+   if(R.foe){if(R.src.dead||R.src.dying>=0){R.done=true;break;}R.x=R.src.x;R.y=R.src.y;   // the boss's fog follows him; its hands grab the player
+    R.grab=(R.grab||0)-dt;if(R.grab<=0&&inFogR(R,P)){R.grab=0.6;damagePlayer(R.dmg,R.src);addFx({kind:'fogHand',x:P.x,y:P.y+4,s:16,dur:0.5});}}
+   else{R.x=P.x;R.y=P.y;
+   for(const e of G.enemies)if(!e.dead&&inFogR(R,e))fogGrab(e,R.dmg,dt);}
    if(R.t>=R.dur)R.done=true;
    break;
   case 'fogmini':
@@ -1206,11 +1353,13 @@ function updateRituals(dt){
    break;
   case 'calamity':
    if(R.t<R.fuse){
-    for(const e of G.enemies)if(!e.dead&&!e.boss&&!e.static&&dist2(e.x,e.y,R.x,R.y)<R.r*R.r)e.slowT=Math.max(e.slowT,0.3);
+    if(R.foe){if(inFoe(R.x,R.y,R.r))P.slowT=Math.max(P.slowT,0.3);}
+    else for(const e of G.enemies)if(!e.dead&&!e.boss&&!e.static&&dist2(e.x,e.y,R.x,R.y)<R.r*R.r)e.slowT=Math.max(e.slowT,0.3);
     if(R.t>5&&onScreen(R.x,R.y,100)&&Math.random()<0.5+0.4*(R.t-5)/3){elPart('tech',R.x+rand(-50,50),R.y-rand(20,80),{sp:2});   // it starts to malfunction
      if(Math.random()<0.2)particle('zap',R.x+rand(-60,60),R.y-rand(10,90),'#ff5050',{v:20,dur:0.2,sz:rand(6,10)});}}
    else{R.done=true;
-    const hit=G.enemies.filter(e=>!e.dead&&dist2(e.x,e.y,R.x,R.y)<(R.r+e.r)**2);
+    if(R.foe&&inFoe(R.x,R.y,R.r))damagePlayer(R.dmg,R.src);
+    const hit=R.foe?[]:G.enemies.filter(e=>!e.dead&&dist2(e.x,e.y,R.x,R.y)<(R.r+e.r)**2);
     for(const e of hit)hitEnemy(e,R.dmg,{});
     for(const e of hit)if(!e.dead&&!e.boss&&!e.static)toGoblin(e);
     addFx({kind:'flash',x:R.x,y:R.y,r:R.r*1.1,color:'#c8fff8',dur:0.7});addFx({kind:'ring',x:R.x,y:R.y,r0:30,r:R.r*1.2,color:'#3ef0e0',w:30,dur:0.8});
@@ -1234,12 +1383,14 @@ function updateRituals(dt){
    break;
   case 'excalibur':
    if(!R.landed&&R.t>=R.land){R.landed=true;   // the sword plants itself with a shockwave
-    damageCircle(R.x,R.y,240,R.quake,{knock:80,fx:R.x,fy:R.y});
+    if(R.foe){if(inFoe(R.x,R.y,R.qr))damagePlayer(R.quake,R.src);const dd=Math.hypot(P.x-R.x,P.y-R.y);if(dd>30)R.a=Math.atan2(P.y-R.y,P.x-R.x);}   // then he aims the beam at the player
+    else damageCircle(R.x,R.y,240,R.quake,{knock:80,fx:R.x,fy:R.y});
     addFx({kind:'ring',x:R.x,y:R.y,r0:20,r:260,color:'#ffd84a',w:16,dur:0.5});addFx({kind:'ring',x:R.x,y:R.y,r0:10,r:200,color:'#ffffff',w:6,dur:0.4});
     debris(R.x,R.y,18,'#6a5a40',1.8);glint(R.x,R.y-60,16,2,60);G.shake=Math.max(G.shake,18);}
    if(!R.fired&&R.t>=R.fire){R.fired=true;   // then the beam of light
     const bx=R.x+Math.cos(R.a)*R.len,by=R.y+Math.sin(R.a)*R.len;
-    damageLine(R.x,R.y,bx,by,R.w,R.dmg,{knock:30,fx:R.x,fy:R.y});
+    if(R.foe){if(segDist2(P.x,P.y,R.x,R.y,bx,by)<(R.w/2+P.r*0.5)**2)damagePlayer(R.dmg,R.src);}
+    else damageLine(R.x,R.y,bx,by,R.w,R.dmg,{knock:30,fx:R.x,fy:R.y});
     addFx({kind:'beam',ax:R.x,ay:R.y-40,bx,by:by-40,w:R.w,color:'#ffd84a',dur:0.9});addFx({kind:'beam',ax:R.x,ay:R.y-40,bx,by:by-40,w:R.w*0.35,color:'#ffffff',dur:0.7});
     for(let k=0;k<40;k++){const f=Math.random(),o=rand(-1,1)*R.w*0.4;glint(R.x+(bx-R.x)*f-Math.sin(R.a)*o,R.y-40+(by-R.y)*f+Math.cos(R.a)*o,1,2);}
     G.shake=Math.max(G.shake,22);G.screenFlash={c:'#fff4c0',t:0,dur:0.6};}
@@ -1347,18 +1498,25 @@ function spawnPos(){
  }
  return null;
 }
-function rollEnemyType(){const w=SPAWN_W[G.floor-1];let tot=0;for(const k in w)tot+=w[k];let r=Math.random()*tot;for(const k in w){if(r<w[k])return k;r-=w[k];}return 'pawn';}
+// A swarm enemy. On floor 7 some become checkered elites (R81).
+function spawnSwarm(type,x,y){const e=spawnEnemy(type,x,y);if(G.floor>=7&&type!=='disciple'&&Math.random()<ELITE_CHANCE)makeElite(e);return e;}
+function makeElite(e){e.elite=true;e.s*=ELITE_SIZE;e.r*=1.25;e.hp*=ELITE_HP;e.maxHp*=ELITE_HP;e.dmg*=1.25;e.score*=3;e.xp*=2;e.gold*=2;return e;}
+function rollEnemyType(){
+ if(G.floor>=7){const w=DOMAIN_SPAWN;let tot=0;for(const k in w)tot+=w[k];let r=Math.random()*tot;
+  for(const k in w){if(r<w[k])return k==='disciple'&&G.enemies.filter(e=>!e.dead&&e.type==='disciple').length>=3?'pawn':k;r-=w[k];}return 'pawn';}
+ const w=SPAWN_W[G.floor-1];let tot=0;for(const k in w)tot+=w[k];let r=Math.random()*tot;for(const k in w){if(r<w[k])return k;r-=w[k];}return 'pawn';}
 function spawnTick(dt){
  if(G.phase==='cleared'||G.merchantFight)return;   // no swarm during the Merchant fight (R78)
  const cap=110+25*G.floor,rate=(0.9+0.45*G.floor+G.floorTime*0.018)*(G.phase==='boss'?0.35:1);
  G.spawnAcc+=rate*dt;
- while(G.spawnAcc>=1){G.spawnAcc--;if(G.enemies.length>=cap)break;const p=spawnPos();if(p)spawnEnemy(rollEnemyType(),p.x,p.y);}
+ if(G.floor===3&&!G.discipleDone&&G.phase==='wave'&&G.floorTime>=G.dur*0.35){const p=spawnPos();if(p){spawnEnemy('disciple',p.x,p.y);G.discipleDone=true;}}   // R80: one per run, hidden in the swarm
+ while(G.spawnAcc>=1){G.spawnAcc--;if(G.enemies.length>=cap)break;const p=spawnPos();if(p)spawnSwarm(rollEnemyType(),p.x,p.y);}
  G.packT-=dt;
  if(G.packT<=0&&G.phase==='wave'){   // the swarm closes in from all sides
   G.packT=rand(14,18);const n=8+G.floor*3,R=Math.hypot(VW,VH)/2+60;
   for(let i=0;i<n;i++){const a=i/n*TAU,x=P.x+Math.cos(a)*R,y=P.y+Math.sin(a)*R;
    if(x<40||y<40||x>WORLD-40||y>WORLD-40||insideStruct(x,y,20))continue;
-   spawnEnemy(G.floor>=3&&i%3===0?'knight':'pawn',x,y);}
+   spawnSwarm(G.floor>=3&&i%3===0?'knight':'pawn',x,y);}
   floatText(P.x,P.y-70,'The swarm closes in!','#ff9a6b',true);
  }
 }
@@ -1415,34 +1573,41 @@ const AI={
 };
 // AI for the Round 5 enemies, kept apart so the six R4 piece behaviours (AI) stay exactly as they were.
 const AI5={
+ disciple(e,dt,dx,dy,d,sp){AI.pawn(e,dt,dx,dy,d,sp);},   // R80: blends into the swarm
  helper(e,dt,dx,dy,d,sp){AI.pawn(e,dt,dx,dy,d,sp);},   // R78: the shop helper acts like a goblin
 };
 function updateEnemy(e,dt){
  e.flash-=dt;e.txtCd-=dt;e.slowT-=dt;e.buffT-=dt;e.cd-=dt;e.cd2-=dt;e.weakT-=dt;if(e.despairT>0)e.despairT-=dt;if(e.doomT>0)e.doomT-=dt;if(e.frozenT>0)e.frozenT-=dt;
  if(e.dots.length)tickDots(e,dt);
  if(e.dead)return;
+ if(e.dying>=0){gmDying(e,dt);return;}   // R83
+ if(e.gmBuffT>0)e.gmBuffT-=dt;
  curShooter=e;
  if(e.static){e.kx=e.ky=0;const dx=P.x-e.x,dy=P.y-e.y;if(e.stunT>0)e.stunT-=dt;else AI[e.type](e,dt,dx,dy,Math.hypot(dx,dy)||1,0);curShooter=null;return;}
  e.x+=e.kx*dt;e.y+=e.ky*dt;const dec=Math.max(0,1-8*dt);e.kx*=dec;e.ky*=dec;
  if(e.sleepT>0){e.sleepT-=dt;}   // R71: asleep (damage does not wake it)
+ else if(e.sweep){e.x+=e.sweep.vx*dt;e.y+=e.sweep.vy*dt;e.sweep.t-=dt;if(e.sweep.t<=0)e.dead=true;}   // R82 rook wall
  else if(e.boss)bossUpdate(e,dt);
  else if(e.charmT>0)charmUpdate(e,dt);
  else if(e.stunT>0){e.stunT-=dt;}
+ else if(e.kamikaze>0){e.kamikaze-=dt;const dx=P.x-e.x,dy=P.y-e.y,d=Math.hypot(dx,dy)||1;moveToward(e,dx,dy,d,Math.max(e.speed*2.4,300),dt);}   // R82 enraged
  else{
   const dx=P.x-e.x,dy=P.y-e.y,d=Math.hypot(dx,dy)||1;
   const sp=e.speed*(e.slowT>0?0.5:1)*(e.buffT>0?1.3:1)*(d>1300?2.2:1);
   (AI[e.type]||AI5[e.type])(e,dt,dx,dy,d,sp);
  }
- if(!e.boss&&e.z<8){e.bumped=collideStructures(e);if(e.bumped&&e.stuckT<=0)e.stuckT=0.6;}
+ if(!e.boss&&!e.sweep&&e.z<8){e.bumped=collideStructures(e);if(e.bumped&&e.stuckT<=0)e.stuckT=0.6;}
  e.x=clamp(e.x,e.r,WORLD-e.r);e.y=clamp(e.y,e.r,WORLD-e.r);
  curShooter=null;
- if(e.z<8&&!(e.charmT>0)&&!(e.sleepT>0)){const rr=e.r+P.r;if(dist2(e.x,e.y,P.x,P.y)<rr*rr)damagePlayer(edmg(e)*(e.dashing?1.5:1),e);}
+ if(e.z<8&&!(e.charmT>0)&&!(e.sleepT>0)){const rr=e.r+P.r;if(dist2(e.x,e.y,P.x,P.y)<rr*rr){
+  if(e.kamikaze>0){damagePlayer(edmg(e)*2.2,e);e.dead=true;burst(e.x,e.y-e.s,14,'#ff3030',1.4);if(pieceLook())shatter(e.x,e.y,e.s,'#24242b','#ff5050');else poof(e.x,e.y,e.s);G.shake=Math.max(G.shake,8);}   // dies headfirst (R82)
+  else damagePlayer(edmg(e)*(e.dashing?1.5:1),e);}}
 }
 function separate(){
  const cell=48,grid=new Map();
  for(const e of G.enemies){if(e.dead||e.z>8)continue;const k=((e.x/cell)|0)*4096+((e.y/cell)|0);let a=grid.get(k);if(!a)grid.set(k,a=[]);a.push(e);}
  for(const e of G.enemies){
-  if(e.dead||e.z>8||e.boss||e.static)continue;const cx=(e.x/cell)|0,cy=(e.y/cell)|0;
+  if(e.dead||e.z>8||e.boss||e.static||e.sweep)continue;const cx=(e.x/cell)|0,cy=(e.y/cell)|0;
   for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const a=grid.get((cx+i)*4096+cy+j);if(!a)continue;
    for(const o of a){if(o===e)continue;const dx=e.x-o.x,dy=e.y-o.y,rr=e.r+o.r,q=dx*dx+dy*dy;
     if(q<rr*rr&&q>0.01){const dd=Math.sqrt(q),push=(rr-dd)*(o.boss||o.static?0.9:0.3);e.x+=dx/dd*push;e.y+=dy/dd*push;}}}
@@ -1494,9 +1659,10 @@ function makeBoss(B,x,y,hp,dmg){
  return b;
 }
 function spawnBoss(){
- const B=BOSSES[G.floor-1],a=rand(0,TAU),hp=B.hp*(1+0.02*(P.level-1))*diff().hp;
+ const B=bossDef(G.floor),a=rand(0,TAU),hp=B.hp*(1+0.02*(P.level-1))*diff().hp;
  const x=clamp(P.x+Math.cos(a)*650,120,WORLD-120),y=clamp(P.y+Math.sin(a)*650,120,WORLD-120);
  const b=makeBoss(B,x,y,hp,B.dmg);
+ if(B===GM_BOSS){b.spellT=1e9;b.atkT=3;}   // he casts Grandmaster spells through his own 'gmspell' attack (R82)
  banner('The '+b.name+' approaches!','Defeat it to clear Floor '+G.floor);G.shake=12;
  addFx({kind:'ring',x,y,r0:20,r:200,color:'#e0b84f',w:10,dur:0.8});
 }
@@ -1531,6 +1697,10 @@ function bossAttack(b,a){
   case 'plus':beamStar(b,0,4,D*1.3);b.busy=1.2;break;
   case 'star':beamStar(b,ang,8,D*1.3);b.busy=1.4;break;
   case 'spiral':b.spiral={t:2.4,acc:0,a:ang,arms:b.enraged?4:3};break;
+  case 'rookwall':b.busy=0.8;rookWall(b);break;   // R82
+  case 'promote':b.busy=0.6;promoteNear(b);break;
+  case 'enrage':b.busy=0.6;enrageAll(b);break;
+  case 'gmspell':if(G.rituals.some(r=>r.foe)){bossAttack(b,pick(['rookwall','promote','enrage']));break;}bossGM(b,pick(GM_FOE_SPELLS));break;
   case 'helpers':b.busy=0.6;spawnHelpers(b,3+f);break;   // R78 the Merchant calls his shop helpers
   case 'goods':b.busy=0.5;fan(b.x,b.y-20,ang,7,0.9,300,D*0.6,'#e0b84f');if(b.enraged)later(0.4,()=>{if(!b.dead)fan(b.x,b.y-20,ang,7,0.9,340,D*0.6,'#e0b84f');});break;   // thrown wares
   case 'ram':   // R78 the cart rams the player
@@ -1559,7 +1729,7 @@ function bossUpdate(b,dt){
  if(b.busy>0){b.busy-=dt;return;}
  if(b.spellT<=0){b.spellT=BOSS_SPELL_EVERY;const pool=bossSpellPool(b);if(pool.length){bossCast(b,pick(pool));return;}}   // R84
  const sp=b.speed*(b.enraged?1.2:1)*slow;if(d>b.r+P.r){b.x+=dx/d*sp*dt;b.y+=dy/d*sp*dt;}
- if(b.atkT<=0){b.atkT=rand(2.0,3.0);bossAttack(b,pick(BOSS_ATTACKS[b.type]));}
+ if(b.atkT<=0){b.atkT=b.type==='grandmaster'?rand(3.2,4.2):rand(2.0,3.0);bossAttack(b,pick(BOSS_ATTACKS[b.type]));}
 }
 // R79: robbing the Merchant. No shop this floor; the next floor starts a few seconds later.
 function onMerchantDown(b){
@@ -1574,28 +1744,40 @@ function onMerchantDown(b){
 }
 function onBossDown(b){
  if(b.type==='merchant'){onMerchantDown(b);return;}
+ if(b.type==='grandmaster'){onGmDown(b);return;}
+ if(G.draftAt&&!G.hasDraft)G.draft={x:G.draftAt.x,y:G.draftAt.y,t:0};G.draftAt=null;   // R80: the draft appears where the disciple fell
  G.score+=2500*G.floor;P.gold+=60*G.floor;G.boss=null;G.phase='cleared';G.clearT=3.5;G.cartT=CART_DELAY;G.cart=null;G.shake=26;
  for(const e of G.enemies)if(!e.dead){e.dead=true;burst(e.x,e.y-e.s,6,'#2a2a33');}
  G.eproj=[];G.hazards=[];G.timers=[];G.ezones=[];
  for(const p of G.pickups){if(p.k==='xp')gainXp(p.v);else P.gold+=p.v;}G.pickups=[];
  gainXp(15*G.floor);
  addFx({kind:'flash',x:b.x,y:b.y,r:400,color:'#ffffff',dur:0.6});
- if(G.floor>=6){banner(L('VICTORY!','CHECKMATE!'),L('The Tyrant King has fallen. The realm is free.','The Checkered King has fallen. You rule the board.'));}
+ if(G.floor>=6&&G.hasDraft){G.kingSlain=true;awardCrown(G.weapon,G.difficulty);G.portalT=CART_DELAY;   // R81: the crown, then a portal to floor 7
+  banner(L('VICTORY!','CHECKMATE!'),L('The Tyrant King has fallen... but a portal tears open.','The Checkered King has fallen... but a portal tears open.'));}
+ else if(G.floor>=6){banner(L('VICTORY!','CHECKMATE!'),L('The Tyrant King has fallen. The realm is free.','The Checkered King has fallen. You rule the board.'));}
  else{P.form=G.floor;FORM_BONUS[P.form].fn();P.maxHp+=20;P.hp=Math.min(P.maxHp,P.hp+P.maxHp*0.5);
   banner(L('Rank up! You are now a ','Promotion! You are now a ')+rankName(),FORM_BONUS[P.form].txt);
   addFx({kind:'ring',x:P.x,y:P.y,r0:10,r:180,color:'#ffffff',w:10,dur:0.8});burst(P.x,P.y-20,40,'#f4ecd8',2);}
 }
 
+// R83: the Grandmaster is gone; the explosion clears the board and the run.
+function onGmDown(b){
+ G.score+=8000*G.floor;G.boss=null;G.phase='cleared';G.clearT=4;G.gmSlain=true;saveMark('slaughtermate_gmcrowns',G.weapon);
+ for(const e of G.enemies)if(!e.dead){e.dead=true;burst(e.x,e.y-e.s,6,'#2a2a33');}
+ G.eproj=[];G.hazards=[];G.timers=[];G.ezones=[];G.rituals=G.rituals.filter(r=>!r.foe);
+ for(const p of G.pickups){if(p.k==='xp')gainXp(p.v);else P.gold+=p.v;}G.pickups=[];
+ banner('THE GRANDMASTER IS UNDONE!','His domain collapses. The game is yours.');
+}
 /* ================= FLOOR FLOW ================= */
 function startFloor(){
- G.floorTime=0;G.phase='wave';G.dur=60+15*G.floor;G.merchantFight=false;G.robbed=false;G.spawnAcc=0;G.packT=rand(12,16);
+ G.floorTime=0;G.phase='wave';G.dur=60+15*G.floor;G.merchantFight=false;G.robbed=false;G.draft=null;G.draftAt=null;G.portal=null;G.portalT=0;G.spawnAcc=0;G.packT=rand(12,16);
  G.enemies=[];G.pproj=[];G.eproj=[];G.hazards=[];G.pstrikes=[];G.zones=[];G.beams=[];G.orbs=[];G.pickups=[];G.timers=[];G.casts=[];G.cart=null;G.rituals=[];G.ezones=[];
  // every floor is a new board (R19): new layout and colour theme, player back in the centre
  G.theme=themeFor(G.floor);G.structs=genMap(G.floor);G.decor=genDecor(G.floor,G.structs);G.corpses=[];P.x=WORLD/2;P.y=WORLD/2;P.rush=null;P.dashT=0;P.windup=0;
- banner('Floor '+G.floor+': '+G.theme.name,G.theme.sub+' · Survive until the '+bossName(BOSSES[G.floor-1])+' arrives');
+ banner('Floor '+G.floor+': '+G.theme.name,G.theme.sub+' · Survive until the '+bossName(bossDef(G.floor))+' arrives');
  if(G.theme.hostile)placeHostiles(G.theme);
  // initial wave pours in from the board's edges
- for(let i=0;i<10+G.floor*4;i++){const p=spawnPos();if(p)spawnEnemy(rollEnemyType(),p.x,p.y);}
+ for(let i=0;i<10+G.floor*4;i++){const p=spawnPos();if(p)spawnSwarm(rollEnemyType(),p.x,p.y);}
 }
 function newRun(w,d){
  G=makeState();G.weapon=w;G.difficulty=DIFFICULTY[d]?d:'normal';P=makePlayer(w);
@@ -1697,7 +1879,9 @@ function update(dt){
  if(G.phase==='wave'&&G.floorTime>=G.dur)spawnBoss();
  if(G.phase==='cleared'){
   if(G.robbed){G.clearT-=dt;if(G.clearT<=0){G.robbed=false;G.floor++;startFloor();}}   // R79: straight on after the robbery
+  else if(G.floor===6&&G.hasDraft)updatePortal(dt);   // R81
   else if(G.floor>=6){G.clearT-=dt;if(G.clearT<=0)endRun(true);}else updateCart(dt);}
+ if(G.draft)updateDraft(dt);
  G.enemies=G.enemies.filter(e=>!e.dead);
 }
 // R84: lingering zones from boss spells; they hurt (and may slow) a player standing in them.
@@ -1783,8 +1967,9 @@ const BELL_SVG='<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="tru
 function loadMarks(k){try{return JSON.parse(localStorage.getItem(k)||'{}');}catch(e){return {};}}
 function saveMark(k,w){const m=loadMarks(k);if(m[w])return false;m[w]=true;try{localStorage.setItem(k,JSON.stringify(m));}catch(e){}return true;}
 const loadBells=()=>loadMarks('slaughtermate_bells'),awardBell=w=>saveMark('slaughtermate_bells',w);
-function marksHTML(w){const b=loadBells()[w];if(!b)return '';
- return '<span class="marks">'+(b?'<span class="bell" title="Robbed the Merchant">'+BELL_SVG+'</span>':'')+'</span>';}
+function marksHTML(w){const b=loadBells()[w],g=loadMarks('slaughtermate_gmcrowns')[w];if(!b&&!g)return '';
+ return '<span class="marks">'+(g?'<span class="crown gm" title="Defeated the Grandmaster">'+L(iconSVG('grandmaster',22,'#ff4fd8'),'<span style="color:#ff4fd8;font-size:22px">♔</span>')+'</span>':'')+
+  (b?'<span class="bell" title="Robbed the Merchant">'+BELL_SVG+'</span>':'')+'</span>';}
 function crownHTML(w){const d=loadCrowns()[w];if(!d)return '';
  return '<span class="crown" title="Cleared on '+DIFFICULTY[d].name+'" style="font-size:'+CROWN_PX[d]+'px;color:'+CROWN_COL[d]+'">'+L(iconSVG('grandmaster',CROWN_PX[d],CROWN_COL[d]),'♔')+'</span>';}
 /* ---------- R55/R60/R62 theme switch ---------- */
@@ -1930,13 +2115,14 @@ function getName(){try{return localStorage.getItem('slaughtermate_name')||'Playe
 function endRun(won){
  if(G.state==='over')return;
  G.state='over';mouse.down=false;
- const final=Math.round((G.score+(G.floor-1)*1000+P.level*50+(won?10000:0))*diff().score);G.final=final;
- const crowned=won&&awardCrown(G.weapon,G.difficulty);
+ const beat=won||G.kingSlain;   // with the draft, beating the floor 6 boss already won the run (R81)
+ const final=Math.round((G.score+(G.floor-1)*1000+P.level*50+(beat?10000:0)+(G.gmSlain?25000:0))*diff().score);G.final=final;
+ const crowned=won&&!G.kingSlain&&awardCrown(G.weapon,G.difficulty);
  const m=Math.floor(G.runTime/60),s=Math.floor(G.runTime%60);
  const el=$('end');
  el.innerHTML=`<div class="panel" style="max-width:640px;text-align:center">
   <h1 style="font-size:42px">${won?L('VICTORY! ⚜','CHECKMATE! ♔'):L('DEFEATED','CHECKMATED ♚')}</h1>
-  <p class="sub">${won?L('The Tyrant King has fallen and the realm is free. Your legend will be sung for ages.','You rose from a lowly pawn to rule the entire board.'):L('Your '+rankName()+' fell on Floor '+G.floor+'.','Your '+FORM_NAMES[P.form]+' was taken on Floor '+G.floor+'.')}</p>
+  <p class="sub">${G.gmSlain?'The Grandmaster glowed, cracked and exploded. His domain is gone, and the whole game is yours.':G.kingSlain&&!won?"You beat the "+bossName(BOSSES[5])+", but fell in the Grandmaster's Domain.":won?L('The Tyrant King has fallen and the realm is free. Your legend will be sung for ages.','You rose from a lowly pawn to rule the entire board.'):L('Your '+rankName()+' fell on Floor '+G.floor+'.','Your '+FORM_NAMES[P.form]+' was taken on Floor '+G.floor+'.')}</p>
   <div class="stats"><div>Score<b>${final.toLocaleString()}</b></div><div>Floor<b>${G.floor}${won?WIN_MARK():''}</b></div><div>Kills<b>${G.kills}</b></div>
   <div>Level<b>${P.level}</b></div><div>Weapon<b>${WEAPONS[G.weapon].name}</b></div><div>Time<b>${m}:${String(s).padStart(2,'0')}</b></div></div>
   <p class="sub">Difficulty: ${diff().name} (score ×${diff().score})</p>
@@ -1946,7 +2132,7 @@ function endRun(won){
  $('saveBtn').onclick=()=>{
   const name=($('nameIn').value||'Player').trim().slice(0,14)||'Player';
   try{localStorage.setItem('slaughtermate_name',name);}catch(e){}
-  const sc=loadScores();sc.push({name,floor:G.floor,score:final,weapon:WEAPONS[G.weapon].name,difficulty:diff().name,won,date:Date.now()});
+  const sc=loadScores();sc.push({name,floor:G.floor,score:final,weapon:WEAPONS[G.weapon].name,difficulty:diff().name,won:beat,date:Date.now()});
   sc.sort((a,b)=>b.score-a.score);saveScores(sc.slice(0,10));showMenu();
  };
  setTimeout(()=>el.classList.remove('hidden'),won?600:900);
@@ -2021,7 +2207,7 @@ function drawDecor(){
   }}
 }
 function drawGround(){
- const th=G.theme,T=100,x0=Math.max(0,Math.floor(cam.x/T)),y0=Math.max(0,Math.floor(cam.y/T)),x1=Math.min(WORLD/T,Math.ceil((cam.x+VW)/T)),y1=Math.min(WORLD/T,Math.ceil((cam.y+VH)/T));
+ const th=G.theme,T=th.tile||100,x0=Math.max(0,Math.floor(cam.x/T)),y0=Math.max(0,Math.floor(cam.y/T)),x1=Math.min(WORLD/T,Math.ceil((cam.x+VW)/T)),y1=Math.min(WORLD/T,Math.ceil((cam.y+VH)/T));
  if(th.ground)drawFantasyGround(th,x0,y0,x1,y1,T);
  else for(let i=x0;i<x1;i++)for(let j=y0;j<y1;j++){ctx.fillStyle=(i+j)%2?th.tileB:th.tileA;ctx.fillRect(i*T,j*T,T,T);}
  if(th.maze&&!th.ground){ctx.strokeStyle='rgba(224,184,79,.18)';ctx.lineWidth=1;for(let i=x0;i<x1;i++)for(let j=y0;j<y1;j++)if((i+j)%2===0)ctx.strokeRect(i*T+3,j*T+3,T-6,T-6);}
@@ -2108,6 +2294,9 @@ function drawWatchtower(e){
 }
 function drawEnemy(e){
  if(e.type==='watchtower')return drawWatchtower(e);
+ if(e.type==='grandmaster'||e.type==='disciple'){const dis=e.type==='disciple',fl=Math.sin(G.time*2.2+e.phase)*(dis?3:8);   // R96: the same design in both looks
+  shadow(e.x,e.y,e.s*(dis?0.8:1.1),0.25);drawGrandmaster(e.x,e.y-fl,e.s,{disciple:dis,flash:e.flash>0,dying:e.dying>=0?e.dying/GM_DYING:0,enraged:e.enraged,buff:e.gmBuffT>0||e.buffT>0});
+  if(dis&&e.hp<e.maxHp){const w=e.s*2.2;bar(e.x-w/2,e.y-e.s*3.4-fl,w,4,e.hp/e.maxHp,'#d33');}return;}
  if(e.type==='merchant')return drawMerchantBoss(e);
  const t=G.time;let bob=0,rot=0,ox=0;
  if(e.boss){bob=Math.abs(Math.sin(t*3))*4;rot=Math.sin(t*2)*0.04;if(e.busy>0||e.spiral)ox=(Math.random()-0.5)*4;}
@@ -2123,9 +2312,9 @@ function drawEnemy(e){
  shadow(e.x,e.y,e.s,e.z>0?0.15:0.28);
  if(e.dashing&&Math.random()<0.4)debris(e.x,e.y,1,'#6a5a4a',0.4);
  if(e.type==='rook'&&e.st==='wind'){ctx.strokeStyle='rgba(255,60,40,.45)';ctx.lineWidth=e.r*2;ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(e.x+Math.sign(e.vx)*500,e.y+Math.sign(e.vy)*500);ctx.stroke();}
- const glow=e.charmT>0?'rgba(255,79,216,.8)':e.frozenT>0?'rgba(190,235,255,.85)':e.despairT>0?'rgba(140,140,140,.8)':e.boss&&e.enraged?'rgba(255,40,40,.75)':e.buffT>0?'rgba(255,215,0,.55)':e.weakT>0?'rgba(255,119,153,.7)':e.slowT>0?'rgba(127,216,255,.65)':e.dashing?'rgba(255,90,60,.6)':e.dots&&e.dots.length?'rgba(190,140,255,.45)':null;
+ const glow=e.kamikaze>0?'rgba(255,30,30,.85)':e.charmT>0?'rgba(255,79,216,.8)':e.frozenT>0?'rgba(190,235,255,.85)':e.despairT>0?'rgba(140,140,140,.8)':e.boss&&e.enraged?'rgba(255,40,40,.75)':e.buffT>0?'rgba(255,215,0,.55)':e.weakT>0?'rgba(255,119,153,.7)':e.slowT>0?'rgba(127,216,255,.65)':e.dashing?'rgba(255,90,60,.6)':e.dots&&e.dots.length?'rgba(190,140,255,.45)':null;
  const charmed=e.charmT>0,frozen=e.frozenT>0;
- if(LOOK==='chess')drawPiece(e.type==='helper'?'pawn':e.type,e.x+ox,e.y-bob-e.z,e.s,{fill:e.flash>0?'#b83a2e':(e.boss?CHECK:charmed?'#f6eef6':frozen?'#9fd8f0':e.type==='helper'?'#d8cfb8':'#24242b'),stroke:e.boss?'#e0b84f':charmed?'#ff4fd8':frozen?'#e9fbff':'#a8a8b8',lw:e.boss?3:1.5,rot,
+ if(pieceLook())drawPiece(e.type==='helper'?'pawn':e.type,e.x+ox,e.y-bob-e.z,e.s,{fill:e.flash>0?'#b83a2e':(e.boss||e.elite?CHECK:charmed?'#f6eef6':frozen?'#9fd8f0':e.type==='helper'?'#d8cfb8':'#24242b'),stroke:e.boss||e.elite?'#e0b84f':charmed?'#ff4fd8':frozen?'#e9fbff':'#a8a8b8',lw:e.boss?3:1.5,rot,
   sx:e.flash>0?1.1:1,sy:e.flash>0?0.9:1,flip:P.x<e.x,glow,eye:e.boss?'#ff3030':'#ff5050'});
  else drawFigure(e.boss?BOSS_LOOK[e.type]:enemyFig(e.type),e.x+ox,e.y-bob-e.z,e.s,{tint:e.flash>0?'#e05a48':frozen?'#a8def4':null,rot:e.sleepT>0?0.25:rot,
   sx:e.flash>0?1.1:1,sy:e.flash>0?0.9:1,flip:P.x<e.x,glow:glow||(e.boss?'rgba(224,184,79,.3)':null),lw:e.boss?2.4:1.3,flap:0.5+0.5*Math.sin(t*5+e.phase)});
@@ -2411,11 +2600,23 @@ function drawWorldFx(){
   if(s.big){ctx.globalAlpha=1;ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(s.x+(1-p)*120,s.y-(1-p)*600,s.r*0.3,0,TAU);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.stroke();}
   else if(p>0.6){ctx.globalAlpha=1;ctx.strokeStyle=s.color;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(s.x,s.y-(1-p)*250-30);ctx.lineTo(s.x,s.y-(1-p)*250);ctx.stroke();}
   ctx.globalAlpha=1;}
+ if(G.draft)drawDraft(G.draft);if(G.portal)drawPortal(G.portal);
  // pickups
  for(const p of G.pickups){if(!onScreen(p.x,p.y,20))continue;
   if(p.k==='xp'){ctx.fillStyle='#5fd0ff';ctx.beginPath();ctx.moveTo(p.x,p.y-7);ctx.lineTo(p.x+5,p.y);ctx.lineTo(p.x,p.y+7);ctx.lineTo(p.x-5,p.y);ctx.closePath();ctx.fill();ctx.strokeStyle='#103040';ctx.lineWidth=1;ctx.stroke();}
   else drawLoot(p.x,p.y,6,(p.rot||0)+Math.sin(G.time*3+p.x)*0.3);}
 }
+// R80: the Grandmaster's Draft, a checkered flask with an eye.
+function drawDraft(d){const x=d.x,y=d.y-14-Math.sin(G.time*3)*4;
+ ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=0.35+0.15*Math.sin(G.time*5);ctx.fillStyle='#ff4fd8';ctx.beginPath();ctx.arc(x,y,30,0,TAU);ctx.fill();ctx.restore();
+ shadow(d.x,d.y,12,0.3);checkerFill(()=>{ctx.moveTo(-0.25,-1.2);ctx.lineTo(0.25,-1.2);ctx.lineTo(0.25,-0.6);ctx.lineTo(0.75,0.1);ctx.lineTo(0.65,0.7);ctx.lineTo(-0.65,0.7);ctx.lineTo(-0.75,0.1);ctx.lineTo(-0.25,-0.6);ctx.closePath();},x,y,18);
+ ctx.fillStyle='#6b4a2a';ctx.fillRect(x-5,y-26,10,6);ctx.fillStyle='#ff4fd8';ctx.beginPath();ctx.ellipse(x,y+2,6,4,0,0,TAU);ctx.fill();ctx.fillStyle='#000';ctx.beginPath();ctx.arc(x,y+2,2,0,TAU);ctx.fill();
+ if(Math.random()<0.2)particle('circle',x+rand(-10,10),y-20,'#ff9bf0',{a:-Math.PI/2,v:30,dur:0.6,sz:3});}
+// R81: the portal to the Grandmaster's Domain.
+function drawPortal(p){const x=p.x,y=p.y,g=clamp(p.t/0.6,0.05,1),t=G.time;
+ ctx.fillStyle='#050008';ctx.beginPath();ctx.ellipse(x,y,70*g,50*g,0,0,TAU);ctx.fill();
+ for(let k=0;k<5;k++){ctx.strokeStyle=k%2?'#ffffff':'#ff4fd8';ctx.lineWidth=5-k*0.6;ctx.beginPath();ctx.ellipse(x,y,70*g*(1-k*0.16),50*g*(1-k*0.16),t*(1.5+k*0.5)*(k%2?-1:1),0,TAU*0.8);ctx.stroke();}
+ if(Math.random()<0.5)particle('piece',x+rand(-60,60)*g,y+rand(-40,40)*g,Math.random()<0.5?'#ffffff':'#9a9a9a',{a:rand(0,TAU),v:-40,dur:0.6,sz:8});}
 // Rotating rune circle (cast glyphs, Mental Inversion's eye glyph, and Grand Seal's four glyphs).
 function drawGlyph(x,y,r,color,alpha,eye){
  ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.lineWidth=2;
@@ -2459,6 +2660,8 @@ function drawRitualGround(){
   else if(R.kind==='calamity'){const a=Math.min(1,R.t/0.4),warn=R.t>5;   // R73: the reactor's slowing field
    drawArea('tech',R.x,R.y,R.r,0.45*a,R.t/R.fuse);
    if(warn){ctx.globalAlpha=0.5+0.5*Math.sin(G.time*(12+(R.t-5)*8));ctx.strokeStyle='#ff3030';ctx.lineWidth=4;ctx.setLineDash([18,12]);ctx.lineDashOffset=G.time*80;blob(R.x,R.y,R.r);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;}}
+  else if(R.kind==='excalibur'&&R.foe&&R.landed&&!R.fired){ctx.globalAlpha=0.25+0.2*Math.sin(G.time*20);ctx.strokeStyle='#ff3c28';ctx.lineWidth=R.w;ctx.lineCap='butt';ctx.beginPath();ctx.moveTo(R.x,R.y);ctx.lineTo(R.x+Math.cos(R.a)*R.len,R.y+Math.sin(R.a)*R.len);ctx.stroke();ctx.globalAlpha=1;   // R82 beam telegraph
+   drawGlyph(R.x,R.y,110,'#ffd84a',0.7,false);}
   else if(R.kind==='excalibur'&&R.landed){const a=Math.min(1,(R.t-R.land)/0.3)*Math.min(1,(R.end-R.t)/0.4);
    ctx.globalAlpha=0.4*a;ctx.fillStyle='#fff3c0';ctx.beginPath();ctx.ellipse(R.x,R.y,150,60,0,0,TAU);ctx.fill();ctx.globalAlpha=1;
    drawGlyph(R.x,R.y,110,'#ffd84a',0.7*a,false);}
@@ -2578,6 +2781,11 @@ function drawProjAndFx(){
  for(const t of G.texts){ctx.globalAlpha=1-Math.max(0,t.t-0.4)/0.4;txt(t.txt,t.x,t.y-t.t*40,t.big?20:14,t.c,'center');}
  ctx.globalAlpha=1;
 }
+// An arrow at the screen edge pointing to an off-screen world point. Returns where it was drawn.
+function edgeArrow(wx,wy,col){const sx=wx-cam.x,sy=wy-cam.y;if(sx>=0&&sy>=0&&sx<=VW&&sy<=VH)return null;
+ const a=Math.atan2(sy-VH/2,sx-VW/2),ax=VW/2+Math.cos(a)*Math.min(VW,VH)*0.38,ay=VH/2+Math.sin(a)*Math.min(VW,VH)*0.38;
+ ctx.save();ctx.translate(ax,ay);ctx.rotate(a);ctx.fillStyle=col;ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(18,0);ctx.lineTo(-10,-12);ctx.lineTo(-4,0);ctx.lineTo(-10,12);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
+ return {x:ax,y:ay};}
 function drawHUD(){
  // player panel
  panel(12,12,330,100);
@@ -2597,17 +2805,17 @@ function drawHUD(){
  // floor / boss info
  const cx=VW/2;
  if(G.phase==='wave'){const left=Math.max(0,Math.ceil(G.dur-G.floorTime));
-  panel(cx-200,12,400,52);txt('FLOOR '+G.floor+' / 6 · '+G.theme.name.toUpperCase(),cx,34,18,'#e0b84f','center');
-  bar(cx-185,42,370,10,G.floorTime/G.dur,'#a98563');txt(bossName(BOSSES[G.floor-1])+' arrives in '+left+'s',cx,78,13,'#f4ecd8','center');}
+  panel(cx-200,12,400,52);txt('FLOOR '+G.floor+' / '+(G.hasDraft?7:6)+' · '+G.theme.name.toUpperCase(),cx,34,18,'#e0b84f','center');
+  bar(cx-185,42,370,10,G.floorTime/G.dur,'#a98563');txt(bossName(bossDef(G.floor))+' arrives in '+left+'s',cx,78,13,'#f4ecd8','center');}
  else if(G.phase==='boss'&&G.boss){const b=G.boss;
   panel(cx-260,12,520,56);txt('FLOOR '+G.floor+' · THE '+b.name.toUpperCase()+(b.enraged?' (ENRAGED)':''),cx,32,16,b.enraged?'#ff7070':'#e0b84f','center');
   if(LOOK==='chess'){ctx.fillStyle=CHECK;ctx.save();ctx.translate(cx-245,40);ctx.scale(40,40);ctx.fillRect(0,0,490/40,16/40);ctx.restore();}
   bar(cx-245,40,490,16,b.hp/b.maxHp,'#b0121b','rgba(0,0,0,.6)');txt(Math.ceil(b.hp).toLocaleString(),cx,53,12,'#fff','center');}
  else{panel(cx-170,12,340,40);txt('FLOOR '+G.floor+' · '+G.theme.name.toUpperCase()+' CLEARED',cx,38,17,'#e0b84f','center');
   if(G.cart){txt(L("Visit the merchants' cart in the centre of the map",'Visit the merchant cart in the centre of the board'),cx,72,14,'#f4ecd8','center');
-   const sx=G.cart.x-cam.x,sy=G.cart.y-cam.y;if(sx<0||sy<0||sx>VW||sy>VH){const a=Math.atan2(sy-VH/2,sx-VW/2),ax=VW/2+Math.cos(a)*Math.min(VW,VH)*0.38,ay=VH/2+Math.sin(a)*Math.min(VW,VH)*0.38;
-    ctx.save();ctx.translate(ax,ay);ctx.rotate(a);ctx.fillStyle='#e0b84f';ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(18,0);ctx.lineTo(-10,-12);ctx.lineTo(-4,0);ctx.lineTo(-10,12);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
-    drawLoot(ax,ay-24,7,0);}}}
+   const q=edgeArrow(G.cart.x,G.cart.y,'#e0b84f');if(q)drawLoot(q.x,q.y-24,7,0);}
+  if(G.portal){txt("Step into the portal to the Grandmaster's Domain",cx,72,14,'#ff9bf0','center');edgeArrow(G.portal.x,G.portal.y,'#ff4fd8');}
+  if(G.draft){txt("The Grandmaster's Draft lies where the disciple fell",cx,92,14,'#ff9bf0','center');edgeArrow(G.draft.x,G.draft.y,'#ff4fd8');}}
  if(G.difficulty!=='normal')txt(diff().name.toUpperCase(),VW-22,100,12,G.difficulty==='hard'?'#ff7070':'#8fd08f','right');
  // spell slots
  const NS=P.spells.length,sw=68,gap=10,sx=cx-(sw*NS+gap*(NS-1))/2,sy=VH-sw-16;   // 5 slots (R76)
@@ -2639,6 +2847,7 @@ function drawHUD(){
  ctx.fillStyle='#d33';for(const e of G.enemies)if(!e.boss&&!e.static)ctx.fillRect(mx+e.x*k-1,my+e.y*k-1,2,2);
  ctx.fillStyle='#ff8a3c';for(const e of G.enemies)if(e.static)ctx.fillRect(mx+e.x*k-3,my+e.y*k-3,6,6);
  if(G.boss){ctx.fillStyle=CHECK;ctx.fillStyle='#e0b84f';ctx.fillRect(mx+G.boss.x*k-4,my+G.boss.y*k-4,8,8);}
+ for(const q of [G.draft,G.portal])if(q){ctx.fillStyle='#ff4fd8';ctx.fillRect(mx+q.x*k-4,my+q.y*k-4,8,8);}
  if(G.cart){ctx.fillStyle='#e0b84f';ctx.fillRect(mx+G.cart.x*k-5,my+G.cart.y*k-5,10,10);ctx.strokeStyle='#000';ctx.lineWidth=1.5;ctx.strokeRect(mx+G.cart.x*k-5,my+G.cart.y*k-5,10,10);}
  ctx.fillStyle='#fff';ctx.fillRect(mx+P.x*k-3,my+P.y*k-3,6,6);
  ctx.strokeStyle='rgba(255,255,255,.4)';ctx.lineWidth=1;ctx.strokeRect(mx+cam.x*k,my+cam.y*k,VW*k,VH*k);

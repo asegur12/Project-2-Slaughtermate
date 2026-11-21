@@ -763,10 +763,10 @@ test('R96 the Grandmaster is a giant eye with two checkered hands and a crown ha
   for (const look of ['fantasy', 'chess']) {
     const g = gmArena(96, look);
     g.run('gmb.x=P.x+200;var dsp=spawnEnemy("disciple",P.x-200,P.y);');
-    g.run(`var __gm=[];{const f=drawGrandmaster;drawGrandmaster=(x,y,s,o)=>{const r=f(x,y,s,o);__gm.push(r.join('+'));return r;};
+    g.run(`var __gm=[];{const f=drawGrandmaster;drawGrandmaster=(x,y,s,o)=>{const r=f(x,y,s,o);__gm.push(r.slice().sort().join('+'));return r;};
       cam.x=P.x-VW/2;cam.y=P.y-VH/2;render();drawGrandmaster=f;}`);
     const drawn = g.run('__gm.join("|")').split('|').sort();
-    assert.deepEqual(drawn, ['eye', 'eye+hand+hand+halo'], look);
+    assert.deepEqual(drawn, ['eye', 'eye+halo+hand+hand'], look);
     assert.ok(g.run('GM_BOSS.s') > g.run('BOSSES[5].s'), 'giant');
   }
 });
