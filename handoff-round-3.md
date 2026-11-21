@@ -3,6 +3,93 @@
 Standing rules for every session are in `CLAUDE.md`. Read that first. This file only covers the
 state at the end of Round 3.
 
+==ROUND 4 CHANGES AND ADDITIONS==
+
+After some thinking, the client has realized that the chess theme doesn't fit the magic spells or weaponry, it stands out too much, to combat this and make the game feel more fitting, the client is asking to change every chess aspect of the game to a more fantasy medieval style, that way, the idea of magic spells and weapons can coexists without feeling out of place
+
+--SPRITE AND DESIGN CHANGES--
+-Player: The player now will change based on class
+	-A knight if the player uses a sword,hammer,shield,club and scythe
+	-A wizard if using tome or staff
+	-an archer if using the bow
+-Enemies: All enemies must now be changed to these
+	-Pawns: now will become goblins
+	-knights: Now will become skeletons
+	-Bishops: Now become apprentice mages
+	-Rooks: Now will become minotaurs
+	-Queens: Now are turned into witches
+	-Kings: Now become royal guards
+-Bosses: Bosses must now be changed too:
+	-Iron pawn now turns into the goblin chief
+	-Mad knight now becomes the evil prince
+	-Bishop (i forgot its name) Now becomes the red mage
+	-Rook now becomes the red dragon
+	-Queen now becomes the witch queen
+	-King now becomes the tyrant king
+-Board and map changes: Completely change the chess board entirely, and replace each of the maps with the following
+	-Floor 1 now is the great plains, a grassy field with trees and gnome villages
+	-Floor 2 is now the Old village, a grass filled town with wooden houses and structures
+	-Floor 3 is now the magic school, a vast azure library filled with bookshelves and study halls
+	-Floor 4 becomes the dragon ruins, a ruin covered stony area with ruins and gems
+	-Floor 5 is now the royal witch swamp, a swampy green marsh that is just outside the royal castle
+	-Floor 6 is the evil kings castle, a royal black,gold and red castle with pillars, statues and halls
+-Game UI: change the chess theme to a fantasy medieval theme
+	-You can choose what it looks like
+	-Text such as the ending "Checkmate" and "The board awaits your move" should also change to fit the theme
+	-Game name: This is more of an unsure one, change the game name to "Magic rush", be sure to highlight in the commit that the games name has changed
+-Enemy behavior:
+	-unchanged, all will still move the same way
+-Shop: replace the pawns with merchants
+
+-special change:
+	-Allow for the user to switch back into the chess theme by pressing a button in the beginning screen
+
+The designs should be relatively simple, nothing over the top, perceive it as best as you can
+
+--OTHER CHANGES--
+-Death animations: originally, the chess piece were supposed to have them shatter, but now that its changed, simply make them fall over and poof, same applies for players. Bosses should unleash a large burst when defeated.
+-Money: Revert to gold, instead use gold bars instead of coins
+
+--SPELLS--
+The client now is requesting more spells and some changes to spells
+-General spells: all spells are unaffected by the design changes
+-Spell icons: Now spells will have icons instead of stars
+	-Fire: fire
+	-Earth: Rocks
+	-Sun: the sun
+	-Moon: cresent moon
+	-Light: A single 4 pointed star
+	-Darkness: A hand
+	-Tech: The stereotypical on/off symbol used on most devices
+	-Ice: a snowflake
+	-Nature: a tree
+	-Hyper: 3 shapes, a circle, triangle and square
+	-Arcane: a swirl
+	-Wind: a tornade
+	-Lightning: a cloud with a thunderbolt
+	-Mind: an eye
+	-Grandmaster spells: A crown
+	-Let me know if an element is not listed
+-Earth type spells: Now have cracks and rocks as particles, the area overlays are now a solid brown
+-Game of despair: Unaffected by design changes, add a second ring of pieces dancing around the orb
+	-The pieces now slow down towards the end of the spell before the burst, just before the burst, the pieces ascend upwards and fade away
+	-The orb that gathers energy should now a crown that shatters and breaks just before the end burst
+-Mental inversion: Make the pulse more vivid and visible
+-Grand seal: The spells color is now a crimson red, and now the design changes
+	-More chains, this time they are not rings
+	-Instead of 5 portals forming a star, 4 Glyphs (Use the design for mental inversion) Form a large spaced out square, now their chains go towards a large Portal, the client didn't feel comfortable with the previous design, which is why this is changing
+++New grandmaster spells++
+-Doom desire: The users fires a weak line at every enemy on screen, these enemies are then marked with doom and will be slowed for the duration, after 5 seconds, many large pillars of grey magic repeatedly smite the effected enemies, dealing damage in a large area around the enemy
+-Sweet slumber: Call forth a very strong breeze of fairy magic that drags enemies into a vortex, in the vortex, fairy outlines form as the spell goes on, after the 3 second pull, the fairy outlines crack and explode, dealing large damage and putting enemies to sleep for 3 7 seconds
+-Fog of the nightmare: Manifest a pitch black fog around you, enemies in this fog will be repeatedly attacked by fog hands when inside it, if enemies are not inside the fog and attack you, a small fog spawns on that enemy
+	-Note: The range is a swarm of large and massive circles, not a single circle
+-Artificial Calamity: Summon futuristic technology to conduct and manage a cruel future reactor, this slows enemies down around it, after 8 seconds pass, the tech malfunctions and explodes, dealing massive damage and turning every enemy into goblins
+-Hellfire: Crimson red fireballs bombard the battlefield, spawning horizontally on the edge of the map and then vertically, the first enemy these fireballs touch will cause a large explosion, dealing damage and leaving a burning pit of fire
+-(I cannot think of another grandmaster spell, so you can choose this one from any reference you think works the best)
+-Give the player 2 extra spell slots
+
+==END OF ROUND 4 REQUIREMENTS==
+
 ## Current state
 
 - Branch `main` is pushed to `origin` (github.com/asegur12/Project-2-Slaughtermate). The last
